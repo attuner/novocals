@@ -1,0 +1,1225 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VocalRemix - Real-time Vocal Remover & Instrumental Player</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              100: '#e0e7ff',
+              400: '#818cf8',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+              900: '#312e81'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    /* Custom Range Slider Styles */
+    input[type=range] {
+      -webkit-appearance: none;
+      background: transparent;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      height: 18px;
+      width: 18px;
+      border-radius: 50%;
+      background: #818cf8;
+      cursor: pointer;
+      margin-top: -6px;
+      box-shadow: 0 0 10px rgba(99, 102, 241, 0.5);
+      transition: transform 0.1s ease;
+    }
+    input[type=range]::-webkit-slider-thumb:hover {
+      transform: scale(1.15);
+      background: #a5b4fc;
+    }
+    input[type=range]::-webkit-slider-runnable-track {
+      width: 100%;
+      height: 6px;
+      cursor: pointer;
+      background: #374151;
+      border-radius: 9999px;
+    }
+    /* Glow Animations */
+    .glow-subtle {
+      box-shadow: 0 0 25px -5px rgba(99, 102, 241, 0.25);
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen font-sans flex flex-col antialiased selection:bg-indigo-500 selection:text-white">
+
+  <header class="border-b border-slate-800 bg-slate-900/60 backdrop-blur-md sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center shadow-lg shadow-indigo-500/30">
+          <i data-lucide="music-4" class="w-5 h-5 text-white"></i>
+        </div>
+        <div>
+          <h1 class="text-lg font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-300 via-indigo-100 to-white">
+            VocalRemix <span class="text-xs px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 font-normal border border-indigo-500/30">Web Audio DSP</span>
+          </h1>
+          <p class="text-xs text-slate-400">Real-time Center-Channel Vocal Extractor & Music Player</p>
+        </div>
+      </div>
+
+      <div class="flex items-center space-x-3">
+        <button id="btnHelp" class="p-2 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white transition flex items-center text-xs gap-1.5 border border-slate-700/60" title="How does vocal cancellation work?">
+          <i data-lucide="info" class="w-4 h-4 text-indigo-400"></i>
+          <span class="hidden sm:inline">How It Works</span>
+        </button>
+        <button id="btnLoadDemo" class="px-3.5 py-1.5 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 hover:text-indigo-200 border border-indigo-500/40 text-xs font-medium flex items-center gap-1.5 transition">
+          <i data-lucide="sparkles" class="w-4 h-4 text-indigo-400"></i>
+          <span>Play Demo Track</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <div id="infoModal" class="hidden fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-700 max-w-lg w-full rounded-2xl p-6 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+        <h3 class="text-lg font-semibold text-white flex items-center gap-2">
+          <i data-lucide="help-circle" class="w-5 h-5 text-indigo-400"></i>
+          Center-Channel Cancellation DSP
+        </h3>
+        <button id="btnCloseModal" class="text-slate-400 hover:text-white p-1 rounded-md">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <div class="text-sm text-slate-300 space-y-3 leading-relaxed">
+        <p>
+          In modern commercial stereo recordings, lead vocals, kick drums, and bass lines are traditionally panned dead-center, meaning their waveform is identical in both Left (<code class="text-indigo-300">L</code>) and Right (<code class="text-indigo-300">R</code>) channels.
+        </p>
+        <p>
+          <strong>Vocal Removal Logic:</strong> By inverting one channel's phase and summing them (<code class="text-indigo-300">L - R</code>), anything identical in both channels cancels out to zero, leaving stereo instruments (guitars, reverb, pads, synthesizers).
+        </p>
+        <p>
+          <strong>Bass Preservation:</strong> Because kick drums and bass guitars are also centered, pure phase subtraction destroys low frequencies. Our DSP engine splits the signal via a crossover filter:
+          frequencies below <strong>200Hz</strong> are kept in pristine mono and mixed back into the final instrumental!
+        </p>
+        <div class="p-3 bg-indigo-950/40 border border-indigo-800/40 rounded-xl text-xs text-indigo-200">
+          💡 <strong>Pro Tip:</strong> Works best with high-quality stereo files where vocals are strictly mixed to center. Mono files or vintage 60s hard-panned tracks will not cancel properly.
+        </div>
+      </div>
+      <div class="pt-2 text-right">
+        <button id="btnDismissModal" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-semibold">Got it</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Notification Toast -->
+  <div id="toast" class="fixed bottom-6 right-6 z-50 transform translate-y-20 opacity-0 transition-all duration-300 flex items-center gap-2.5 px-4 py-3 rounded-xl bg-slate-800 text-slate-100 border border-slate-700 shadow-xl text-xs">
+    <i data-lucide="check-circle" class="w-4 h-4 text-emerald-400"></i>
+    <span id="toastMsg">Ready</span>
+  </div>
+
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 flex flex-col gap-6">
+
+    <!-- Upload / Drag & Drop Strip -->
+    <div id="dropZone" class="group relative border-2 border-dashed border-slate-700 hover:border-indigo-500/70 bg-slate-900/40 hover:bg-slate-900/80 rounded-2xl p-6 sm:p-8 text-center transition-all duration-200 cursor-pointer">
+      <input type="file" id="fileInput" accept="audio/*,.mp3,.wav,.ogg,.aac,.flac,.m4a" class="hidden">
+      <div class="flex flex-col items-center justify-center gap-3">
+        <div class="w-14 h-14 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 group-hover:scale-105 group-hover:bg-indigo-500/20 transition flex items-center justify-center">
+          <i data-lucide="upload-cloud" class="w-7 h-7 text-indigo-400"></i>
+        </div>
+        <div>
+          <p class="text-sm font-medium text-slate-200">
+            <span class="text-indigo-400 font-semibold underline decoration-indigo-500/40 underline-offset-4">Click to upload</span> or drag and drop any audio file
+          </p>
+          <p class="text-xs text-slate-400 mt-1">Supports MP3, WAV, FLAC, AAC, OGG files (Stereo recommended)</p>
+        </div>
+        <div id="loadedFileInfo" class="hidden items-center gap-2 text-xs font-mono text-emerald-400 bg-emerald-950/40 border border-emerald-800/50 px-3 py-1.5 rounded-lg mt-1">
+          <i data-lucide="music" class="w-3.5 h-3.5"></i>
+          <span id="currentFileName">No track loaded</span>
+          <span id="audioSampleRate" class="text-slate-400 text-[10px]"></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      
+      <!-- Visualizer & Primary Controls (Left 8 cols) -->
+      <div class="lg:col-span-8 flex flex-col gap-6">
+        
+        <!-- Audio Spectrum & Stereo Oscilloscope Canvas Card -->
+        <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-lg flex flex-col gap-3 relative overflow-hidden">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+              <h2 class="text-xs font-bold uppercase tracking-wider text-slate-300">Live Frequency & Phase Spectrum</h2>
+            </div>
+            <div class="flex items-center gap-3 text-xs text-slate-400 font-mono">
+              <span id="visModeLabel" class="bg-slate-800 px-2 py-0.5 rounded border border-slate-700">Real-Time Output</span>
+              <span id="stereoBalanceLabel">L / R Balanced</span>
+            </div>
+          </div>
+
+          <!-- Canvas Container -->
+          <div class="relative w-full h-56 bg-slate-950 rounded-xl border border-slate-800/80 overflow-hidden">
+            <canvas id="visualizerCanvas" class="w-full h-full block"></canvas>
+            <div id="canvasOverlay" class="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/60 backdrop-blur-[2px] transition-opacity">
+              <i data-lucide="disc-3" class="w-10 h-10 text-indigo-400/70 mb-2 animate-spin-slow"></i>
+              <span class="text-xs text-slate-300 font-medium">Load or Play audio to engage real-time spectral analyzer</span>
+            </div>
+          </div>
+
+          <!-- Mode Selector Tabs -->
+          <div class="pt-2">
+            <label class="text-xs font-medium text-slate-400 mb-2 block">Processing Mode</label>
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2" id="modeSelectorGroup">
+              <button data-mode="instrumental" class="mode-btn active px-3 py-2.5 rounded-xl border border-indigo-500 bg-indigo-600/20 text-indigo-200 text-xs font-medium flex flex-col items-center gap-1 transition">
+                <i data-lucide="mic-off" class="w-4 h-4"></i>
+                <span>Instrumental</span>
+                <span class="text-[10px] text-slate-400 opacity-80">Bass Preserved</span>
+              </button>
+              <button data-mode="sideOnly" class="mode-btn px-3 py-2.5 rounded-xl border border-slate-800 bg-slate-800/40 text-slate-300 hover:bg-slate-800 text-xs font-medium flex flex-col items-center gap-1 transition">
+                <i data-lucide="scissors" class="w-4 h-4"></i>
+                <span>Hard Cut (L-R)</span>
+                <span class="text-[10px] text-slate-400 opacity-80">Pure Difference</span>
+              </button>
+              <button data-mode="isolatedVocal" class="mode-btn px-3 py-2.5 rounded-xl border border-slate-800 bg-slate-800/40 text-slate-300 hover:bg-slate-800 text-xs font-medium flex flex-col items-center gap-1 transition">
+                <i data-lucide="mic" class="w-4 h-4"></i>
+                <span>Acapella Focus</span>
+                <span class="text-[10px] text-slate-400 opacity-80">Center Isolated</span>
+              </button>
+              <button data-mode="original" class="mode-btn px-3 py-2.5 rounded-xl border border-slate-800 bg-slate-800/40 text-slate-300 hover:bg-slate-800 text-xs font-medium flex flex-col items-center gap-1 transition">
+                <i data-lucide="music-2" class="w-4 h-4"></i>
+                <span>Original (A/B)</span>
+                <span class="text-[10px] text-slate-400 opacity-80">Bypass Filter</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-lg flex flex-col gap-4">
+          <!-- Timeline seek bar -->
+          <div class="flex flex-col gap-1.5">
+            <div class="flex justify-between text-xs font-mono text-slate-400">
+              <span id="currentTimeLabel">0:00</span>
+              <span id="totalDurationLabel">0:00</span>
+            </div>
+            <input type="range" id="seekSlider" min="0" max="100" value="0" step="0.1" class="w-full h-2">
+          </div>
+
+          <!-- Transport Buttons and Quick Controls -->
+          <div class="flex flex-wrap items-center justify-between gap-4 pt-1">
+            <div class="flex items-center gap-3">
+              <button id="btnSkipBack" class="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition" title="Rewind 5s">
+                <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+              </button>
+              
+              <button id="btnPlayPause" class="w-12 h-12 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white flex items-center justify-center shadow-lg shadow-indigo-600/30 transition transform active:scale-95 disabled:opacity-50 disabled:pointer-events-none">
+                <i data-lucide="play" id="playIcon" class="w-6 h-6 fill-current"></i>
+              </button>
+
+              <button id="btnSkipForward" class="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition" title="Forward 5s">
+                <i data-lucide="rotate-cw" class="w-4 h-4"></i>
+              </button>
+
+              <button id="btnLoop" class="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition" title="Toggle Loop">
+                <i data-lucide="repeat" id="loopIcon" class="w-4 h-4"></i>
+              </button>
+            </div>
+
+            <!-- Volume & Speed Controls -->
+            <div class="flex items-center gap-5">
+              <div class="flex items-center gap-2">
+                <button id="btnMute" class="text-slate-400 hover:text-white p-1">
+                  <i data-lucide="volume-2" id="volumeIcon" class="w-4 h-4"></i>
+                </button>
+                <input type="range" id="volumeSlider" min="0" max="1" step="0.01" value="0.85" class="w-20 sm:w-28 h-1.5" title="Master Volume">
+              </div>
+
+              <div class="flex items-center gap-1.5 bg-slate-800 px-2.5 py-1 rounded-xl border border-slate-700 text-xs">
+                <i data-lucide="gauge" class="w-3.5 h-3.5 text-slate-400"></i>
+                <select id="playbackRateSelect" class="bg-transparent text-slate-200 outline-none text-xs cursor-pointer">
+                  <option value="0.75" class="bg-slate-900">0.75x</option>
+                  <option value="1.0" selected class="bg-slate-900">1.0x (Normal)</option>
+                  <option value="1.25" class="bg-slate-900">1.25x</option>
+                  <option value="1.5" class="bg-slate-900">1.5x</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="lg:col-span-4 flex flex-col gap-6">
+        
+        <!-- DSP Tuning Controls Card -->
+        <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-lg flex flex-col gap-4">
+          <div class="flex items-center justify-between pb-2 border-b border-slate-800">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+              <i data-lucide="sliders" class="w-4 h-4 text-indigo-400"></i>
+              Acoustic DSP Parameters
+            </h3>
+            <button id="btnResetFilters" class="text-[11px] text-indigo-400 hover:text-indigo-300 hover:underline">Reset</button>
+          </div>
+
+          <!-- Parameter 1: Vocal Suppression Strength -->
+          <div class="space-y-1.5">
+            <div class="flex justify-between items-center text-xs">
+              <span class="text-slate-300 font-medium">Cancellation Depth</span>
+              <span id="valVocalDepth" class="font-mono text-indigo-400 font-semibold">100%</span>
+            </div>
+            <input type="range" id="sliderVocalDepth" min="0" max="1" step="0.01" value="1.0" class="w-full">
+            <p class="text-[11px] text-slate-400">Sets the phase inversion gain factor for center material.</p>
+          </div>
+
+          <!-- Parameter 2: Bass Crossover Frequency -->
+          <div class="space-y-1.5">
+            <div class="flex justify-between items-center text-xs">
+              <span class="text-slate-300 font-medium">Bass Crossover Cutoff</span>
+              <span id="valBassCutoff" class="font-mono text-indigo-400 font-semibold">220 Hz</span>
+            </div>
+            <input type="range" id="sliderBassCutoff" min="80" max="400" step="5" value="220" class="w-full">
+            <p class="text-[11px] text-slate-400">Protects bass guitar and kick drums below this frequency.</p>
+          </div>
+
+          <!-- Parameter 3: Bass Retention Level -->
+          <div class="space-y-1.5">
+            <div class="flex justify-between items-center text-xs">
+              <span class="text-slate-300 font-medium">Bass Preservation Boost</span>
+              <span id="valBassGain" class="font-mono text-indigo-400 font-semibold">1.1x</span>
+            </div>
+            <input type="range" id="sliderBassGain" min="0" max="2" step="0.05" value="1.1" class="w-full">
+            <p class="text-[11px] text-slate-400">Compensates low-end punch lost during channel subtraction.</p>
+          </div>
+
+          <!-- Parameter 4: Vocal Notch Width (Q factor) -->
+          <div class="space-y-1.5">
+            <div class="flex justify-between items-center text-xs">
+              <span class="text-slate-300 font-medium">Mid-Frequency Width</span>
+              <span id="valBandWidth" class="font-mono text-indigo-400 font-semibold">1.0 Q</span>
+            </div>
+            <input type="range" id="sliderBandWidth" min="0.2" max="3" step="0.1" value="1.0" class="w-full">
+            <p class="text-[11px] text-slate-400">Tones the focal boundary of the vocal suppression filter.</p>
+          </div>
+        </div>
+
+        <!-- Export Instrumental File Card -->
+        <div class="bg-gradient-to-br from-indigo-950/40 to-slate-900 border border-indigo-900/40 rounded-2xl p-5 shadow-lg flex flex-col gap-3">
+          <div class="flex items-center gap-2">
+            <i data-lucide="download" class="w-5 h-5 text-indigo-400"></i>
+            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-200">Export Processed Audio</h3>
+          </div>
+          <p class="text-xs text-slate-400 leading-relaxed">
+            Renders the active vocal-removed filter in high-definition offline audio and produces an uncompressed 16-bit WAV file ready for karaoke or remixes.
+          </p>
+
+          <button id="btnExportWav" class="w-full py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:scale-[0.98] text-white font-medium text-xs flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/30 transition disabled:opacity-50 disabled:pointer-events-none">
+            <i data-lucide="file-audio" class="w-4 h-4"></i>
+            <span id="exportBtnText">Export Instrumental (WAV)</span>
+          </button>
+          
+          <div id="exportProgressBar" class="hidden w-full bg-slate-800 rounded-full h-2 overflow-hidden">
+            <div id="exportProgressFill" class="bg-indigo-500 h-full w-0 transition-all duration-150"></div>
+          </div>
+        </div>
+
+        <!-- Practical Audio Guide Box -->
+        <div class="bg-slate-900/50 border border-slate-800/80 rounded-2xl p-4 text-xs text-slate-400 space-y-2">
+          <div class="flex items-center gap-1.5 font-semibold text-slate-300">
+            <i data-lucide="check-check" class="w-4 h-4 text-emerald-400"></i>
+            <span>Recommended Tracks</span>
+          </div>
+          <ul class="list-disc list-inside space-y-1 text-[11px] text-slate-400">
+            <li>Modern Pop & Dance with prominent centered lead vocals.</li>
+            <li>Rock/Indie songs with wide stereo electric guitars.</li>
+            <li>Tracks with rich left/right backing instruments.</li>
+          </ul>
+        </div>
+
+      </div>
+
+    </div>
+  </main>
+
+  <script>
+    // Master context & nodes
+    let audioCtx = null;
+    let audioBuffer = null;
+    let sourceNode = null;
+    let isPlaying = false;
+    let isLooping = false;
+    let playbackStartTime = 0;
+    let startOffset = 0;
+    let activeMode = 'instrumental'; // 'instrumental', 'sideOnly', 'isolatedVocal', 'original'
+    let animationFrameId = null;
+
+    // DSP Node references
+    let splitter = null;
+    let leftGain = null;
+    let rightGain = null;
+    let sideInverter = null;
+    let merger = null;
+    let masterGain = null;
+    let bassFilter = null;
+    let bassGain = null;
+    let vocalNotchFilter = null;
+    let analyser = null;
+
+    // DOM Elements
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+    const loadedFileInfo = document.getElementById('loadedFileInfo');
+    const currentFileName = document.getElementById('currentFileName');
+    const audioSampleRate = document.getElementById('audioSampleRate');
+    const btnPlayPause = document.getElementById('btnPlayPause');
+    const playIcon = document.getElementById('playIcon');
+    const btnSkipBack = document.getElementById('btnSkipBack');
+    const btnSkipForward = document.getElementById('btnSkipForward');
+    const btnLoop = document.getElementById('btnLoop');
+    const loopIcon = document.getElementById('loopIcon');
+    const seekSlider = document.getElementById('seekSlider');
+    const currentTimeLabel = document.getElementById('currentTimeLabel');
+    const totalDurationLabel = document.getElementById('totalDurationLabel');
+    const volumeSlider = document.getElementById('volumeSlider');
+    const btnMute = document.getElementById('btnMute');
+    const volumeIcon = document.getElementById('volumeIcon');
+    const playbackRateSelect = document.getElementById('playbackRateSelect');
+    const btnExportWav = document.getElementById('btnExportWav');
+    const exportBtnText = document.getElementById('exportBtnText');
+    const exportProgressBar = document.getElementById('exportProgressBar');
+    const exportProgressFill = document.getElementById('exportProgressFill');
+    const btnLoadDemo = document.getElementById('btnLoadDemo');
+    const btnHelp = document.getElementById('btnHelp');
+    const infoModal = document.getElementById('infoModal');
+    const btnCloseModal = document.getElementById('btnCloseModal');
+    const btnDismissModal = document.getElementById('btnDismissModal');
+    const toast = document.getElementById('toast');
+    const toastMsg = document.getElementById('toastMsg');
+    const canvas = document.getElementById('visualizerCanvas');
+    const canvasOverlay = document.getElementById('canvasOverlay');
+    const canvasCtx = canvas.getContext('2d');
+    const modeButtons = document.querySelectorAll('.mode-btn');
+
+    // DSP Slider Elements
+    const sliderVocalDepth = document.getElementById('sliderVocalDepth');
+    const valVocalDepth = document.getElementById('valVocalDepth');
+    const sliderBassCutoff = document.getElementById('sliderBassCutoff');
+    const valBassCutoff = document.getElementById('valBassCutoff');
+    const sliderBassGain = document.getElementById('sliderBassGain');
+    const valBassGain = document.getElementById('valBassGain');
+    const sliderBandWidth = document.getElementById('sliderBandWidth');
+    const valBandWidth = document.getElementById('valBandWidth');
+    const btnResetFilters = document.getElementById('btnResetFilters');
+
+    function showToast(message, isError = false) {
+      toastMsg.textContent = message;
+      toast.classList.remove('translate-y-20', 'opacity-0');
+      toast.classList.add('translate-y-0', 'opacity-100');
+      const icon = toast.querySelector('i');
+      if (icon) {
+        icon.setAttribute('data-lucide', isError ? 'alert-triangle' : 'check-circle');
+        icon.className = `w-4 h-4 ${isError ? 'text-amber-400' : 'text-emerald-400'}`;
+        lucide.createIcons();
+      }
+      setTimeout(() => {
+        toast.classList.remove('translate-y-0', 'opacity-100');
+        toast.classList.add('translate-y-20', 'opacity-0');
+      }, 3500);
+    }
+
+    function formatTime(seconds) {
+      if (isNaN(seconds) || seconds < 0) return '0:00';
+      const m = Math.floor(seconds / 60);
+      const s = Math.floor(seconds % 60);
+      return `${m}:${s < 10 ? '0' : ''}${s}`;
+    }
+
+    function initAudioContext() {
+      if (!audioCtx) {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        audioCtx = new AudioContextClass();
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+    }
+
+    /**
+     * Constructs the real-time DSP routing graph:
+     * Source -> Splitter [L, R]
+     * Inverted Matrix:
+     *   Center cancellation:
+     *     L_processed = L - (depth * R)
+     *     R_processed = R - (depth * L)
+     *   Bass Preservation Crossover:
+     *     Mono Sum -> LowPass Filter (<220Hz) -> bassGain -> Added back to both channels
+     */
+    function buildDspGraph() {
+      if (!audioCtx) return;
+
+      // Master Output Volume
+      masterGain = audioCtx.createGain();
+      masterGain.gain.value = parseFloat(volumeSlider.value);
+
+      // Spectrum Analyser
+      analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 512;
+      analyser.smoothingTimeConstant = 0.82;
+
+      // Channel Splitter (Left = 0, Right = 1)
+      splitter = audioCtx.createChannelSplitter(2);
+
+      // Stereo Invert Matrix nodes
+      leftGain = audioCtx.createGain();     // L path
+      rightGain = audioCtx.createGain();    // R path
+      sideInverter = audioCtx.createGain(); // Cross subtractor (-1)
+      sideInverter.gain.value = -parseFloat(sliderVocalDepth.value);
+
+      // Mid-Band Vocal Peaking / Notch Filter to refine center vocal suppression
+      vocalNotchFilter = audioCtx.createBiquadFilter();
+      vocalNotchFilter.type = "peaking";
+      vocalNotchFilter.frequency.value = 1000;
+      vocalNotchFilter.Q.value = parseFloat(sliderBandWidth.value);
+      vocalNotchFilter.gain.value = 0; // neutral initially
+
+      // Bass Preservation Lowpass crossover filter
+      bassFilter = audioCtx.createBiquadFilter();
+      bassFilter.type = "lowpass";
+      bassFilter.frequency.value = parseFloat(sliderBassCutoff.value);
+
+      bassGain = audioCtx.createGain();
+      bassGain.gain.value = parseFloat(sliderBassGain.value);
+
+      // Channel Merger to recreate stereo
+      merger = audioCtx.createChannelMerger(2);
+
+      // Connect master output to speakers and analyzer
+      masterGain.connect(analyser);
+      analyser.connect(audioCtx.destination);
+    }
+
+    function updateRoutingForCurrentMode() {
+      if (!audioCtx || !sourceNode) return;
+
+      try {
+        // Disconnect existing connections from source and splitter
+        sourceNode.disconnect();
+        splitter.disconnect();
+        leftGain.disconnect();
+        rightGain.disconnect();
+        sideInverter.disconnect();
+        bassFilter.disconnect();
+        bassGain.disconnect();
+        merger.disconnect();
+
+        const depth = parseFloat(sliderVocalDepth.value);
+        const bassVal = parseFloat(sliderBassGain.value);
+
+        if (activeMode === 'original') {
+          // Bypass: Direct source to Master
+          sourceNode.connect(masterGain);
+        } else if (activeMode === 'sideOnly') {
+          // Pure (L - R) Difference
+          sourceNode.connect(splitter);
+          
+          // Left output receives L - R
+          splitter.connect(leftGain, 0); // L
+          splitter.connect(sideInverter, 1); // -R
+          sideInverter.gain.value = -1.0;
+
+          leftGain.connect(merger, 0, 0);
+          sideInverter.connect(merger, 0, 0);
+
+          // Right output receives R - L
+          const rInv = audioCtx.createGain();
+          rInv.gain.value = -1.0;
+          splitter.connect(rightGain, 1);
+          splitter.connect(rInv, 0);
+
+          rightGain.connect(merger, 0, 1);
+          rInv.connect(merger, 0, 1);
+
+          merger.connect(masterGain);
+        } else if (activeMode === 'isolatedVocal') {
+          // Center Isolation: Center = (L + R)/2 - |L - R| or sum cancellation
+          // Direct mono sum emphasizes center vocal
+          const sumGain = audioCtx.createGain();
+          sumGain.gain.value = 0.5;
+          sourceNode.connect(sumGain);
+          
+          // Apply bandpass to isolate vocal frequency register (300Hz - 3400Hz)
+          const vocalBand = audioCtx.createBiquadFilter();
+          vocalBand.type = "bandpass";
+          vocalBand.frequency.value = 1400;
+          vocalBand.Q.value = 0.7;
+
+          sumGain.connect(vocalBand);
+          vocalBand.connect(masterGain);
+        } else {
+          // Instrumental Mode: Center Cancellation + Bass Crossover Re-injection
+          sourceNode.connect(splitter);
+
+          // 1. Channel Inversion Matrix
+          sideInverter.gain.value = -depth;
+
+          // Left channel = L - (depth * R)
+          splitter.connect(leftGain, 0);
+          splitter.connect(sideInverter, 1);
+          leftGain.connect(merger, 0, 0);
+          sideInverter.connect(merger, 0, 0);
+
+          // Right channel = R - (depth * L)
+          const rightCrossInverter = audioCtx.createGain();
+          rightCrossInverter.gain.value = -depth;
+          splitter.connect(rightGain, 1);
+          splitter.connect(rightCrossInverter, 0);
+          rightGain.connect(merger, 0, 1);
+          rightCrossInverter.connect(merger, 0, 1);
+
+          // 2. Bass Preservation: Extract mono low-end from source
+          bassFilter.frequency.value = parseFloat(sliderBassCutoff.value);
+          bassGain.gain.value = bassVal;
+
+          sourceNode.connect(bassFilter);
+          bassFilter.connect(bassGain);
+
+          // Route preserved bass back to both Left and Right channels
+          bassGain.connect(merger, 0, 0);
+          bassGain.connect(merger, 0, 1);
+
+          // Send merged stereo signal to Master
+          merger.connect(masterGain);
+        }
+      } catch (err) {
+        console.error("DSP routing error:", err);
+      }
+    }
+
+    function playAudio(fromTime = null) {
+      if (!audioBuffer) {
+        showToast("Please load an audio file or click 'Play Demo Track' first.", true);
+        return;
+      }
+      initAudioContext();
+
+      if (isPlaying) {
+        stopAudioPlayback(false);
+      }
+
+      sourceNode = audioCtx.createBufferSource();
+      sourceNode.buffer = audioBuffer;
+      sourceNode.loop = isLooping;
+      sourceNode.playbackRate.value = parseFloat(playbackRateSelect.value);
+
+      if (fromTime !== null) {
+        startOffset = fromTime;
+      }
+
+      buildDspGraph();
+      updateRoutingForCurrentMode();
+
+      sourceNode.onended = () => {
+        if (!isLooping && isPlaying && getCurrentAudioTime() >= audioBuffer.duration - 0.2) {
+          pauseAudio();
+          startOffset = 0;
+          seekSlider.value = 0;
+          currentTimeLabel.textContent = "0:00";
+        }
+      };
+
+      sourceNode.start(0, startOffset);
+      playbackStartTime = audioCtx.currentTime;
+      isPlaying = true;
+      updatePlayButtonUI(true);
+      canvasOverlay.classList.add('opacity-0', 'pointer-events-none');
+    }
+
+    function pauseAudio() {
+      if (isPlaying && sourceNode) {
+        startOffset += (audioCtx.currentTime - playbackStartTime) * parseFloat(playbackRateSelect.value);
+        if (startOffset > audioBuffer.duration) startOffset = 0;
+        stopAudioPlayback(false);
+      }
+      isPlaying = false;
+      updatePlayButtonUI(false);
+    }
+
+    function stopAudioPlayback(resetOffset = true) {
+      if (sourceNode) {
+        try {
+          sourceNode.stop();
+          sourceNode.disconnect();
+        } catch (e) {}
+        sourceNode = null;
+      }
+      if (resetOffset) startOffset = 0;
+    }
+
+    function togglePlayPause() {
+      if (isPlaying) {
+        pauseAudio();
+      } else {
+        playAudio();
+      }
+    }
+
+    function getCurrentAudioTime() {
+      if (!isPlaying || !audioCtx) return startOffset;
+      const rate = parseFloat(playbackRateSelect.value) || 1.0;
+      let cur = startOffset + (audioCtx.currentTime - playbackStartTime) * rate;
+      if (audioBuffer && isLooping && cur > audioBuffer.duration) {
+        cur = cur % audioBuffer.duration;
+      }
+      return cur;
+    }
+
+    function updatePlayButtonUI(playing) {
+      if (playing) {
+        playIcon.setAttribute('data-lucide', 'pause');
+      } else {
+        playIcon.setAttribute('data-lucide', 'play');
+      }
+      lucide.createIcons();
+    }
+
+    function generateDemoTrack() {
+      initAudioContext();
+      showToast("Synthesizing multi-track stereo demo audio...");
+
+      const sampleRate = audioCtx.sampleRate;
+      const duration = 12.0; // 12 seconds loop
+      const totalSamples = Math.floor(sampleRate * duration);
+      const demoBuffer = audioCtx.createBuffer(2, totalSamples, sampleRate);
+      const left = demoBuffer.getChannelData(0);
+      const right = demoBuffer.getChannelData(1);
+
+      // Generate a rich stereo musical backing track with centered "vocal" melody
+      for (let i = 0; i < totalSamples; i++) {
+        const t = i / sampleRate;
+        const beat = (t * 2.0) % 1.0; // 120 BPM
+        
+        // 1. Kick Drum (Dead Center, punchy low-end 50Hz)
+        const kickPitch = Math.max(45, 140 * Math.exp(-beat * 24));
+        const kickEnv = Math.exp(-beat * 12);
+        const kick = Math.sin(2 * Math.PI * kickPitch * t) * kickEnv * 0.45;
+
+        // 2. Bass Guitar (Dead Center, 65Hz / 82Hz)
+        const bassNote = (Math.floor(t * 2) % 4 === 3) ? 82.4 : 65.4;
+        const bass = Math.sin(2 * Math.PI * bassNote * t) * 0.22;
+
+        // 3. Wide Stereo Synthesizer Chords (Hard Left & Hard Right with phase offsets)
+        // Chords: Am, F, C, G
+        const chordProgressions = [220, 174.6, 261.6, 196.0];
+        const chordBase = chordProgressions[Math.floor(t) % 4];
+        
+        // Left synth has slight detune and chorusing
+        const leftSynth = (
+          Math.sin(2 * Math.PI * chordBase * t) +
+          0.5 * Math.sin(2 * Math.PI * chordBase * 1.5 * t) +
+          0.3 * Math.sin(2 * Math.PI * chordBase * 2.01 * t)
+        ) * 0.15;
+
+        // Right synth is detuned in opposite phase for massive stereo width
+        const rightSynth = (
+          Math.sin(2 * Math.PI * (chordBase + 1.8) * t) +
+          0.5 * Math.sin(2 * Math.PI * (chordBase * 1.5 - 1.2) * t) +
+          0.3 * Math.sin(2 * Math.PI * (chordBase * 1.99) * t)
+        ) * 0.15;
+
+        // 4. Stereo Hi-Hats (Left & Right alternating ticks)
+        const hatEnv = Math.exp(-((t * 4.0) % 1.0) * 45);
+        const hatNoise = (Math.random() * 2 - 1) * hatEnv * 0.08;
+        const leftHat = ((Math.floor(t * 4) % 2 === 0) ? hatNoise : 0);
+        const rightHat = ((Math.floor(t * 4) % 2 === 1) ? hatNoise : 0);
+
+        // 5. "Center Vocal" Simulation: A distinct formant-like lead melody panned STRICTLY to Center (L == R)
+        // Simulated formant frequencies (520Hz, 880Hz, 1200Hz)
+        const vocalNotes = [440, 523.25, 659.25, 587.33, 523.25, 440];
+        const currentVocalFreq = vocalNotes[Math.floor(t * 1.5) % vocalNotes.length];
+        const vocalVibrato = 1 + 0.015 * Math.sin(2 * Math.PI * 5.5 * t);
+        
+        // Characteristic resonant vocal-like sawtooth harmonic
+        let vocalLead = (
+          Math.sin(2 * Math.PI * currentVocalFreq * vocalVibrato * t) * 0.35 +
+          0.25 * Math.sin(2 * Math.PI * currentVocalFreq * 2 * vocalVibrato * t) +
+          0.18 * Math.sin(2 * Math.PI * currentVocalFreq * 3 * vocalVibrato * t)
+        );
+        // Vocal phrasing envelope (breathing rhythm)
+        const vocalPhrase = Math.max(0, Math.sin(2 * Math.PI * (t / 2.0)));
+        vocalLead *= (0.4 + 0.6 * vocalPhrase) * 0.28;
+
+        // Combine into Left and Right channels:
+        // Notice: kick, bass, and vocalLead are identical on both channels (Center).
+        // synths and hats are panned wide (Stereo).
+        left[i] = Math.max(-1, Math.min(1, kick + bass + leftSynth + leftHat + vocalLead));
+        right[i] = Math.max(-1, Math.min(1, kick + bass + rightSynth + rightHat + vocalLead));
+      }
+
+      loadDecodedAudioBuffer(demoBuffer, "Stereo_Synth_Pop_Demo (Synthesized).wav");
+      showToast("Demo loaded! Click Play or toggle modes to test vocal removal.");
+    }
+
+    function loadDecodedAudioBuffer(buffer, filename) {
+      if (isPlaying) {
+        stopAudioPlayback(true);
+      }
+      audioBuffer = buffer;
+      startOffset = 0;
+      seekSlider.value = 0;
+      seekSlider.max = buffer.duration;
+      currentTimeLabel.textContent = "0:00";
+      totalDurationLabel.textContent = formatTime(buffer.duration);
+
+      currentFileName.textContent = filename;
+      audioSampleRate.textContent = `${buffer.sampleRate}Hz • ${buffer.numberOfChannels === 2 ? 'Stereo' : 'Mono'}`;
+      loadedFileInfo.classList.remove('hidden');
+      loadedFileInfo.classList.add('flex');
+
+      // Auto start playback on user action
+      playAudio(0);
+    }
+
+    async function handleAudioFile(file) {
+      if (!file) return;
+      initAudioContext();
+      showToast(`Loading "${file.name}"...`);
+
+      try {
+        const arrayBuffer = await file.arrayBuffer();
+        audioCtx.decodeAudioData(
+          arrayBuffer,
+          (decodedBuffer) => {
+            if (decodedBuffer.numberOfChannels < 2) {
+              showToast("Warning: File is Mono! Center-channel cancellation requires a Stereo track.", true);
+            }
+            loadDecodedAudioBuffer(decodedBuffer, file.name);
+            showToast(`Loaded: ${file.name}`);
+          },
+          (err) => {
+            console.error(err);
+            showToast("Failed to decode audio. Please try another audio format.", true);
+          }
+        );
+      } catch (err) {
+        console.error(err);
+        showToast("Error reading file.", true);
+      }
+    }
+
+    async function exportInstrumentalWav() {
+      if (!audioBuffer) {
+        showToast("No audio loaded to export.", true);
+        return;
+      }
+
+      btnExportWav.disabled = true;
+      exportBtnText.textContent = "Rendering Instrumental...";
+      exportProgressBar.classList.remove('hidden');
+      exportProgressFill.style.width = "15%";
+
+      try {
+        const duration = audioBuffer.duration;
+        const sampleRate = audioBuffer.sampleRate;
+        const offlineCtx = new OfflineAudioContext(2, Math.ceil(duration * sampleRate), sampleRate);
+
+        // Build equivalent DSP tree in Offline context
+        const offSource = offlineCtx.createBufferSource();
+        offSource.buffer = audioBuffer;
+
+        const offSplitter = offlineCtx.createChannelSplitter(2);
+        const offLeftGain = offlineCtx.createGain();
+        const offRightGain = offlineCtx.createGain();
+        const offSideInverter = offlineCtx.createGain();
+        const offRightCrossInverter = offlineCtx.createGain();
+        const offMerger = offlineCtx.createChannelMerger(2);
+
+        const depth = parseFloat(sliderVocalDepth.value);
+        const bassVal = parseFloat(sliderBassGain.value);
+        const bassCutoff = parseFloat(sliderBassCutoff.value);
+
+        offSideInverter.gain.value = -depth;
+        offRightCrossInverter.gain.value = -depth;
+
+        // Routing
+        offSource.connect(offSplitter);
+
+        // L - depth * R
+        offSplitter.connect(offLeftGain, 0);
+        offSplitter.connect(offSideInverter, 1);
+        offLeftGain.connect(offMerger, 0, 0);
+        offSideInverter.connect(offMerger, 0, 0);
+
+        // R - depth * L
+        offSplitter.connect(offRightGain, 1);
+        offSplitter.connect(offRightCrossInverter, 0);
+        offRightGain.connect(offMerger, 0, 1);
+        offRightCrossInverter.connect(offMerger, 0, 1);
+
+        // Low-pass bass crossover filter
+        const offBassFilter = offlineCtx.createBiquadFilter();
+        offBassFilter.type = "lowpass";
+        offBassFilter.frequency.value = bassCutoff;
+
+        const offBassGain = offlineCtx.createGain();
+        offBassGain.gain.value = bassVal;
+
+        offSource.connect(offBassFilter);
+        offBassFilter.connect(offBassGain);
+
+        offBassGain.connect(offMerger, 0, 0);
+        offBassGain.connect(offMerger, 0, 1);
+
+        offMerger.connect(offlineCtx.destination);
+        offSource.start(0);
+
+        exportProgressFill.style.width = "50%";
+
+        const renderedBuffer = await offlineCtx.startRendering();
+        exportProgressFill.style.width = "85%";
+
+        // Convert rendered audio buffer to WAV Blob
+        const wavBlob = audioBufferToWavBlob(renderedBuffer);
+        const downloadUrl = URL.createObjectURL(wavBlob);
+
+        // Trigger automatic download
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = downloadUrl;
+        const originalName = currentFileName.textContent.replace(/\.[^/.]+$/, "");
+        a.download = `${originalName}_Instrumental.wav`;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => {
+          document.body.removeChild(a);
+          URL.revokeObjectURL(downloadUrl);
+        }, 2000);
+
+        exportProgressFill.style.width = "100%";
+        showToast("Instrumental WAV successfully generated and downloaded!");
+      } catch (err) {
+        console.error("Export failed:", err);
+        showToast("Failed to export audio.", true);
+      } finally {
+        setTimeout(() => {
+          btnExportWav.disabled = false;
+          exportBtnText.textContent = "Export Instrumental (WAV)";
+          exportProgressBar.classList.add('hidden');
+          exportProgressFill.style.width = "0%";
+        }, 1200);
+      }
+    }
+
+    // Standard IEEE Float/PCM 16-bit WAV encoder
+    function audioBufferToWavBlob(buffer) {
+      const numOfChan = buffer.numberOfChannels;
+      const length = buffer.length * numOfChan * 2 + 44;
+      const out = new DataView(new ArrayBuffer(length));
+      const channels = [];
+      let sample = 0;
+      let offset = 0;
+      let pos = 0;
+
+      // write RIFF chunk descriptor
+      writeString(out, 0, 'RIFF');
+      out.setUint32(4, 36 + buffer.length * numOfChan * 2, true);
+      writeString(out, 8, 'WAVE');
+      // write FMT sub-chunk
+      writeString(out, 12, 'fmt ');
+      out.setUint32(16, 16, true); // Subchunk1Size (16 for PCM)
+      out.setUint16(20, 1, true);  // AudioFormat (1 = PCM)
+      out.setUint16(22, numOfChan, true);
+      out.setUint32(24, buffer.sampleRate, true);
+      out.setUint32(28, buffer.sampleRate * 2 * numOfChan, true); // ByteRate
+      out.setUint16(32, numOfChan * 2, true); // BlockAlign
+      out.setUint16(34, 16, true); // BitsPerSample
+      // write data sub-chunk
+      writeString(out, 36, 'data');
+      out.setUint32(40, buffer.length * numOfChan * 2, true);
+
+      for (let i = 0; i < buffer.numberOfChannels; i++) {
+        channels.push(buffer.getChannelData(i));
+      }
+
+      offset = 44;
+      while (pos < buffer.length) {
+        for (let i = 0; i < numOfChan; i++) {
+          sample = Math.max(-1, Math.min(1, channels[i][pos]));
+          sample = (sample < 0 ? sample * 32768 : sample * 32767) | 0;
+          out.setInt16(offset, sample, true);
+          offset += 2;
+        }
+        pos++;
+      }
+
+      return new Blob([out.buffer], { type: 'audio/wav' });
+
+      function writeString(view, offset, string) {
+        for (let i = 0; i < string.length; i++) {
+          view.setUint8(offset + i, string.charCodeAt(i));
+        }
+      }
+    }
+
+    function renderVisualizer() {
+      animationFrameId = requestAnimationFrame(renderVisualizer);
+
+      const width = canvas.width = canvas.parentElement.clientWidth;
+      const height = canvas.height = canvas.parentElement.clientHeight;
+
+      // Dark background gradient
+      const bgGrad = canvasCtx.createLinearGradient(0, 0, 0, height);
+      bgGrad.addColorStop(0, '#090d16');
+      bgGrad.addColorStop(1, '#020617');
+      canvasCtx.fillStyle = bgGrad;
+      canvasCtx.fillRect(0, 0, width, height);
+
+      // Subtle background grid
+      canvasCtx.strokeStyle = 'rgba(51, 65, 85, 0.2)';
+      canvasCtx.lineWidth = 1;
+      for (let x = 0; x < width; x += 40) {
+        canvasCtx.beginPath();
+        canvasCtx.moveTo(x, 0);
+        canvasCtx.lineTo(x, height);
+        canvasCtx.stroke();
+      }
+      for (let y = 0; y < height; y += 30) {
+        canvasCtx.beginPath();
+        canvasCtx.moveTo(0, y);
+        canvasCtx.lineTo(width, y);
+        canvasCtx.stroke();
+      }
+
+      if (!analyser || !isPlaying) return;
+
+      const bufferLength = analyser.frequencyBinCount;
+      const dataArray = new Uint8Array(bufferLength);
+      analyser.getByteFrequencyData(dataArray);
+
+      // Frequency bars with modern indigo-to-cyan gradient
+      const barWidth = (width / bufferLength) * 2.2;
+      let barX = 0;
+
+      for (let i = 0; i < bufferLength; i++) {
+        const barHeight = (dataArray[i] / 255) * (height * 0.85);
+
+        const barGrad = canvasCtx.createLinearGradient(0, height, 0, height - barHeight);
+        barGrad.addColorStop(0, 'rgba(79, 70, 229, 0.2)');
+        barGrad.addColorStop(0.5, 'rgba(99, 102, 241, 0.8)');
+        barGrad.addColorStop(1, 'rgba(129, 140, 248, 1)');
+
+        canvasCtx.fillStyle = barGrad;
+        canvasCtx.fillRect(barX, height - barHeight, barWidth - 1.5, barHeight);
+
+        // Highlight tip dot
+        if (barHeight > 8) {
+          canvasCtx.fillStyle = '#c7d2fe';
+          canvasCtx.fillRect(barX, height - barHeight - 2, barWidth - 1.5, 2);
+        }
+
+        barX += barWidth;
+        if (barX > width) break;
+      }
+
+      // Update playhead progress bar
+      if (audioBuffer) {
+        const curTime = getCurrentAudioTime();
+        seekSlider.value = curTime;
+        currentTimeLabel.textContent = formatTime(curTime);
+      }
+    }
+
+    function setupEventListeners() {
+      // File Drop Zone
+      dropZone.addEventListener('click', () => fileInput.click());
+      fileInput.addEventListener('change', (e) => {
+        if (e.target.files && e.target.files[0]) {
+          handleAudioFile(e.target.files[0]);
+        }
+      });
+
+      ['dragenter', 'dragover'].forEach(eventName => {
+        dropZone.addEventListener(eventName, (e) => {
+          e.preventDefault();
+          dropZone.classList.add('border-indigo-500', 'bg-indigo-950/20');
+        }, false);
+      });
+
+      ['dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, (e) => {
+          e.preventDefault();
+          dropZone.classList.remove('border-indigo-500', 'bg-indigo-950/20');
+        }, false);
+      });
+
+      dropZone.addEventListener('drop', (e) => {
+        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+          handleAudioFile(e.dataTransfer.files[0]);
+        }
+      });
+
+      // Transport controls
+      btnPlayPause.addEventListener('click', togglePlayPause);
+      
+      btnSkipBack.addEventListener('click', () => {
+        if (!audioBuffer) return;
+        const newTime = Math.max(0, getCurrentAudioTime() - 5);
+        playAudio(newTime);
+      });
+
+      btnSkipForward.addEventListener('click', () => {
+        if (!audioBuffer) return;
+        const newTime = Math.min(audioBuffer.duration, getCurrentAudioTime() + 5);
+        playAudio(newTime);
+      });
+
+      btnLoop.addEventListener('click', () => {
+        isLooping = !isLooping;
+        if (sourceNode) sourceNode.loop = isLooping;
+        if (isLooping) {
+          btnLoop.classList.add('text-indigo-400', 'bg-indigo-950/60', 'border', 'border-indigo-500/40');
+          showToast("Loop playback enabled");
+        } else {
+          btnLoop.classList.remove('text-indigo-400', 'bg-indigo-950/60', 'border', 'border-indigo-500/40');
+          showToast("Loop playback disabled");
+        }
+      });
+
+      // Scrubbing Seek Slider
+      seekSlider.addEventListener('input', () => {
+        if (audioBuffer) {
+          currentTimeLabel.textContent = formatTime(parseFloat(seekSlider.value));
+        }
+      });
+
+      seekSlider.addEventListener('change', () => {
+        if (audioBuffer) {
+          const seekTo = parseFloat(seekSlider.value);
+          if (isPlaying) {
+            playAudio(seekTo);
+          } else {
+            startOffset = seekTo;
+          }
+        }
+      });
+
+      // Volume & Mute
+      volumeSlider.addEventListener('input', () => {
+        const val = parseFloat(volumeSlider.value);
+        if (masterGain) masterGain.gain.value = val;
+        volumeIcon.setAttribute('data-lucide', val === 0 ? 'volume-x' : (val < 0.5 ? 'volume-1' : 'volume-2'));
+        lucide.createIcons();
+      });
+
+      btnMute.addEventListener('click', () => {
+        if (volumeSlider.value > 0) {
+          volumeSlider.dataset.prev = volumeSlider.value;
+          volumeSlider.value = 0;
+        } else {
+          volumeSlider.value = volumeSlider.dataset.prev || 0.8;
+        }
+        volumeSlider.dispatchEvent(new Event('input'));
+      });
+
+      // Playback speed
+      playbackRateSelect.addEventListener('change', () => {
+        const rate = parseFloat(playbackRateSelect.value);
+        if (sourceNode) sourceNode.playbackRate.value = rate;
+      });
+
+      // Processing Mode Selection
+      modeButtons.forEach(btn => {
+        btn.addEventListener('click', () => {
+          modeButtons.forEach(b => {
+            b.classList.remove('active', 'border-indigo-500', 'bg-indigo-600/20', 'text-indigo-200');
+            b.classList.add('border-slate-800', 'bg-slate-800/40', 'text-slate-300');
+          });
+          btn.classList.add('active', 'border-indigo-500', 'bg-indigo-600/20', 'text-indigo-200');
+          btn.classList.remove('border-slate-800', 'bg-slate-800/40', 'text-slate-300');
+
+          activeMode = btn.dataset.mode;
+          updateRoutingForCurrentMode();
+
+          const labels = {
+            instrumental: "Instrumental (Vocal Removed)",
+            sideOnly: "Hard Cut Difference (L - R)",
+            isolatedVocal: "Acapella Focus (Center Isolated)",
+            original: "Original Stereo (Bypass)"
+          };
+          showToast(`Mode switched: ${labels[activeMode]}`);
+        });
+      });
+
+      // DSP Param Sliders
+      sliderVocalDepth.addEventListener('input', () => {
+        valVocalDepth.textContent = `${Math.round(sliderVocalDepth.value * 100)}%`;
+        updateRoutingForCurrentMode();
+      });
+
+      sliderBassCutoff.addEventListener('input', () => {
+        valBassCutoff.textContent = `${sliderBassCutoff.value} Hz`;
+        updateRoutingForCurrentMode();
+      });
+
+      sliderBassGain.addEventListener('input', () => {
+        valBassGain.textContent = `${parseFloat(sliderBassGain.value).toFixed(1)}x`;
+        updateRoutingForCurrentMode();
+      });
+
+      sliderBandWidth.addEventListener('input', () => {
+        valBandWidth.textContent = `${parseFloat(sliderBandWidth.value).toFixed(1)} Q`;
+        if (vocalNotchFilter) vocalNotchFilter.Q.value = parseFloat(sliderBandWidth.value);
+      });
+
+      btnResetFilters.addEventListener('click', () => {
+        sliderVocalDepth.value = 1.0;
+        sliderBassCutoff.value = 220;
+        sliderBassGain.value = 1.1;
+        sliderBandWidth.value = 1.0;
+        
+        sliderVocalDepth.dispatchEvent(new Event('input'));
+        sliderBassCutoff.dispatchEvent(new Event('input'));
+        sliderBassGain.dispatchEvent(new Event('input'));
+        sliderBandWidth.dispatchEvent(new Event('input'));
+        showToast("DSP filters reset to balanced defaults");
+      });
+
+      // Demo Track & Export
+      btnLoadDemo.addEventListener('click', generateDemoTrack);
+      btnExportWav.addEventListener('click', exportInstrumentalWav);
+
+      // Info modal toggling
+      btnHelp.addEventListener('click', () => infoModal.classList.remove('hidden'));
+      btnCloseModal.addEventListener('click', () => infoModal.classList.add('hidden'));
+      btnDismissModal.addEventListener('click', () => infoModal.classList.add('hidden'));
+      infoModal.addEventListener('click', (e) => {
+        if (e.target === infoModal) infoModal.classList.add('hidden');
+      });
+
+      // Keyboard spacebar shortcut for play/pause
+      window.addEventListener('keydown', (e) => {
+        if (e.code === 'Space' && e.target.tagName !== 'INPUT' && e.target.tagName !== 'SELECT') {
+          e.preventDefault();
+          togglePlayPause();
+        }
+      });
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      lucide.createIcons();
+      setupEventListeners();
+      renderVisualizer();
+    });
+  </script>
+</body>
+</html>
