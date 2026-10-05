@@ -1,0 +1,1252 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Acapella Studio - Vocal Isolator & Center-Channel Extractor</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            vocal: {
+              50: '#faf5ff',
+              100: '#f3e8ff',
+              200: '#e9d5ff',
+              300: '#d8b4fe',
+              400: '#c084fc',
+              500: '#a855f7',
+              600: '#9333ea',
+              700: '#7e22ce',
+              800: '#6b21a8',
+              900: '#581c87',
+              950: '#3b0764'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    input[type=range] {
+      -webkit-appearance: none;
+      background: transparent;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      height: 18px;
+      width: 18px;
+      border-radius: 50%;
+      background: #c084fc;
+      cursor: pointer;
+      margin-top: -6px;
+      box-shadow: 0 0 12px rgba(192, 132, 252, 0.6);
+      transition: transform 0.1s ease, background-color 0.15s ease;
+    }
+    input[type=range]::-webkit-slider-thumb:hover {
+      transform: scale(1.18);
+      background: #d8b4fe;
+    }
+    input[type=range]::-webkit-slider-runnable-track {
+      width: 100%;
+      height: 6px;
+      cursor: pointer;
+      background: #1f2937;
+      border-radius: 9999px;
+    }
+    .custom-scroll::-webkit-scrollbar {
+      width: 6px;
+    }
+    .custom-scroll::-webkit-scrollbar-track {
+      background: #0f172a;
+    }
+    .custom-scroll::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen font-sans flex flex-col antialiased selection:bg-purple-600 selection:text-white">
+
+  <!-- Top Navigation Header -->
+  <header class="border-b border-purple-950/60 bg-slate-900/80 backdrop-blur-md sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-purple-600 to-fuchsia-500 flex items-center justify-center shadow-lg shadow-purple-600/30">
+          <i data-lucide="mic" class="w-5 h-5 text-white"></i>
+        </div>
+        <div>
+          <h1 class="text-lg font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-300 via-pink-100 to-white flex items-center gap-2">
+            Acapella Studio
+            <span class="text-[10px] px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 font-medium border border-purple-500/30 tracking-wide uppercase">Vocal Extractor</span>
+          </h1>
+          <p class="text-xs text-slate-400">Mid/Side Subtractive DSP & Harmonic Vocal Bandpass Filter</p>
+        </div>
+      </div>
+
+      <div class="flex items-center space-x-3">
+        <button id="btnHelp" class="p-2 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white transition flex items-center text-xs gap-1.5 border border-slate-700/60" title="How does vocal isolation work?">
+          <i data-lucide="help-circle" class="w-4 h-4 text-purple-400"></i>
+          <span class="hidden sm:inline">How It Works</span>
+        </button>
+        <button id="btnLoadDemo" class="px-3.5 py-1.5 rounded-lg bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:from-purple-500 hover:to-fuchsia-500 text-white shadow-md shadow-purple-600/20 text-xs font-medium flex items-center gap-1.5 transition active:scale-95">
+          <i data-lucide="sparkles" class="w-4 h-4 text-purple-200"></i>
+          <span>Synthesize Demo Track</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- DSP Explanation Modal -->
+  <div id="infoModal" class="hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-purple-900/60 max-w-lg w-full rounded-2xl p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto custom-scroll">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+        <h3 class="text-base font-semibold text-white flex items-center gap-2">
+          <i data-lucide="waveform" class="w-5 h-5 text-purple-400"></i>
+          How Acapella Extraction Works
+        </h3>
+        <button id="btnCloseModal" class="text-slate-400 hover:text-white p-1 rounded-md">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <div class="text-xs text-slate-300 space-y-3 leading-relaxed">
+        <p>
+          In professional stereo mixes, lead vocal tracks are almost universally recorded and placed in the <strong>stereo center</strong> ($L = R$), whereas wide instruments (electric guitars, synth pads, cymbals, reverbs, brass) are panned hard left or right.
+        </p>
+        <div class="p-3 bg-purple-950/40 border border-purple-800/40 rounded-xl space-y-1.5 font-mono text-[11px] text-purple-200">
+          <div>• <strong>Mid Channel (Center):</strong> $M = (L + R) / 2$</div>
+          <div>• <strong>Side Channel (Stereo):</strong> $S = (L - R) / 2$</div>
+          <div>• <strong>Vocal Isolation Signal:</strong> $V_{iso} = M - (\text{Suppression} \times S)$</div>
+        </div>
+        <p>
+          <strong>Bandpass & Presence Equalization:</strong> Even with side subtraction, center-panned instruments like kick drums, sub bass, and cymbals share the mid channel. Our DSP applies:
+        </p>
+        <ul class="list-disc list-inside space-y-1 pl-1 text-slate-400">
+          <li><strong>High-Pass Filter:</strong> Strips sub-frequencies below 160Hz (removing kick drum thuds & bass lines).</li>
+          <li><strong>Low-Pass Filter:</strong> Cuts frequencies above 5.5kHz (stripping bright hi-hat sizzle & cymbal sheen).</li>
+          <li><strong>Vocal Presence Peaking EQ:</strong> Boosts the vocal formant sweet-spot (1kHz - 3.5kHz) to bring human vocals forward.</li>
+        </ul>
+      </div>
+      <div class="pt-2 text-right">
+        <button id="btnDismissModal" class="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-xs font-semibold">Understand & Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Notification Toast -->
+  <div id="toast" class="fixed bottom-6 right-6 z-50 transform translate-y-20 opacity-0 transition-all duration-300 flex items-center gap-2.5 px-4 py-3 rounded-xl bg-slate-800 text-slate-100 border border-purple-500/40 shadow-xl text-xs">
+    <i data-lucide="check-circle" class="w-4 h-4 text-purple-400"></i>
+    <span id="toastMsg">Ready</span>
+  </div>
+
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 flex flex-col gap-6">
+
+    <!-- Upload / Drag & Drop Strip -->
+    <div id="dropZone" class="group relative border-2 border-dashed border-slate-700 hover:border-purple-500/70 bg-slate-900/40 hover:bg-slate-900/80 rounded-2xl p-6 sm:p-7 text-center transition-all duration-200 cursor-pointer">
+      <input type="file" id="fileInput" accept="audio/*,.mp3,.wav,.ogg,.aac,.flac,.m4a" class="hidden">
+      <div class="flex flex-col items-center justify-center gap-2.5">
+        <div class="w-13 h-13 p-3 rounded-2xl bg-purple-500/10 border border-purple-500/20 group-hover:scale-105 group-hover:bg-purple-500/20 transition flex items-center justify-center">
+          <i data-lucide="music" class="w-7 h-7 text-purple-400"></i>
+        </div>
+        <div>
+          <p class="text-sm font-medium text-slate-200">
+            <span class="text-purple-400 font-semibold underline decoration-purple-500/40 underline-offset-4">Click to select audio</span> or drag and drop any song file here
+          </p>
+          <p class="text-xs text-slate-400 mt-1">Supports MP3, WAV, FLAC, AAC, OGG (Stereo required for center cancellation)</p>
+        </div>
+        <div id="loadedFileInfo" class="hidden items-center gap-2 text-xs font-mono text-purple-300 bg-purple-950/50 border border-purple-800/50 px-3 py-1.5 rounded-lg mt-1">
+          <i data-lucide="disc" class="w-3.5 h-3.5 text-purple-400"></i>
+          <span id="currentFileName">No track loaded</span>
+          <span id="audioSampleRate" class="text-slate-400 text-[10px]"></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      
+      <!-- Left Column: Visualizer & Player Transport Controls (8 Cols) -->
+      <div class="lg:col-span-8 flex flex-col gap-6">
+        
+        <!-- Frequency Spectrum Visualizer Card -->
+        <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-lg flex flex-col gap-3 relative overflow-hidden">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-purple-500 animate-pulse"></span>
+              <h2 class="text-xs font-bold uppercase tracking-wider text-slate-300">Spectral Vocal Formant Monitor</h2>
+            </div>
+            <div class="flex items-center gap-3 text-xs text-slate-400 font-mono">
+              <span id="activeModeBadge" class="bg-purple-950/60 text-purple-300 px-2 py-0.5 rounded border border-purple-800/60 text-[11px]">Acapella Isolated</span>
+              <span id="filterCutoffRangeBadge" class="text-[11px] text-slate-400">180Hz - 5.5kHz</span>
+            </div>
+          </div>
+
+          <!-- Canvas Container -->
+          <div class="relative w-full h-56 bg-slate-950 rounded-xl border border-slate-800/80 overflow-hidden">
+            <canvas id="visualizerCanvas" class="w-full h-full block"></canvas>
+            <div id="canvasOverlay" class="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/70 backdrop-blur-[2px] transition-opacity">
+              <i data-lucide="mic-2" class="w-10 h-10 text-purple-400/80 mb-2 animate-bounce"></i>
+              <span class="text-xs text-slate-300 font-medium">Load an audio file or click "Synthesize Demo Track" to inspect vocals</span>
+            </div>
+          </div>
+
+          <!-- Listening Modes Selection Bar -->
+          <div class="pt-2">
+            <label class="text-xs font-medium text-slate-400 mb-2 block flex items-center justify-between">
+              <span>Instant A/B Audition Modes</span>
+              <span class="text-[11px] text-purple-400">Switch live without interruption</span>
+            </label>
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2" id="modeSelectorGroup">
+              
+              <button data-mode="acapella" class="mode-btn active px-3 py-2.5 rounded-xl border border-purple-500 bg-purple-600/25 text-purple-200 text-xs font-medium flex flex-col items-center gap-1 transition shadow-sm">
+                <i data-lucide="mic" class="w-4 h-4 text-purple-400"></i>
+                <span class="font-semibold">Acapella Isolated</span>
+                <span class="text-[10px] text-purple-300/80">Center + Bandpass</span>
+              </button>
+
+              <button data-mode="centerRaw" class="mode-btn px-3 py-2.5 rounded-xl border border-slate-800 bg-slate-800/40 text-slate-300 hover:bg-slate-800 text-xs font-medium flex flex-col items-center gap-1 transition">
+                <i data-lucide="minimize-2" class="w-4 h-4"></i>
+                <span>Center Raw (Mid)</span>
+                <span class="text-[10px] text-slate-400">(L + R) / 2 Only</span>
+              </button>
+
+              <button data-mode="sidesInstrumental" class="mode-btn px-3 py-2.5 rounded-xl border border-slate-800 bg-slate-800/40 text-slate-300 hover:bg-slate-800 text-xs font-medium flex flex-col items-center gap-1 transition">
+                <i data-lucide="sliders-horizontal" class="w-4 h-4"></i>
+                <span>Stereo Sides Only</span>
+                <span class="text-[10px] text-slate-400">What Was Removed</span>
+              </button>
+
+              <button data-mode="original" class="mode-btn px-3 py-2.5 rounded-xl border border-slate-800 bg-slate-800/40 text-slate-300 hover:bg-slate-800 text-xs font-medium flex flex-col items-center gap-1 transition">
+                <i data-lucide="volume-2" class="w-4 h-4"></i>
+                <span>Original Mix (A/B)</span>
+                <span class="text-[10px] text-slate-400">Bypass Isolation</span>
+              </button>
+
+            </div>
+          </div>
+        </div>
+
+        <!-- Player Transport Control Card -->
+        <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-lg flex flex-col gap-4">
+          <!-- Timeline Seek Slider -->
+          <div class="flex flex-col gap-1.5">
+            <div class="flex justify-between text-xs font-mono text-slate-400">
+              <span id="currentTimeLabel">0:00</span>
+              <span id="totalDurationLabel">0:00</span>
+            </div>
+            <input type="range" id="seekSlider" min="0" max="100" value="0" step="0.1" class="w-full h-2">
+          </div>
+
+          <!-- Buttons Row -->
+          <div class="flex flex-wrap items-center justify-between gap-4 pt-1">
+            <div class="flex items-center gap-3">
+              <button id="btnSkipBack" class="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition" title="Rewind 5s">
+                <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+              </button>
+              
+              <button id="btnPlayPause" class="w-12 h-12 rounded-xl bg-gradient-to-tr from-purple-600 to-fuchsia-600 hover:from-purple-500 hover:to-fuchsia-500 text-white flex items-center justify-center shadow-lg shadow-purple-600/30 transition transform active:scale-95 disabled:opacity-50 disabled:pointer-events-none">
+                <i data-lucide="play" id="playIcon" class="w-6 h-6 fill-current"></i>
+              </button>
+
+              <button id="btnSkipForward" class="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition" title="Forward 5s">
+                <i data-lucide="rotate-cw" class="w-4 h-4"></i>
+              </button>
+
+              <button id="btnLoop" class="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition" title="Toggle Loop">
+                <i data-lucide="repeat" id="loopIcon" class="w-4 h-4"></i>
+              </button>
+            </div>
+
+            <!-- Volume & Speed Controls -->
+            <div class="flex items-center gap-5">
+              <div class="flex items-center gap-2">
+                <button id="btnMute" class="text-slate-400 hover:text-white p-1">
+                  <i data-lucide="volume-2" id="volumeIcon" class="w-4 h-4"></i>
+                </button>
+                <input type="range" id="volumeSlider" min="0" max="1" step="0.01" value="0.9" class="w-20 sm:w-28 h-1.5" title="Master Volume">
+              </div>
+
+              <div class="flex items-center gap-1.5 bg-slate-800 px-2.5 py-1 rounded-xl border border-slate-700 text-xs">
+                <i data-lucide="gauge" class="w-3.5 h-3.5 text-slate-400"></i>
+                <select id="playbackRateSelect" class="bg-transparent text-slate-200 outline-none text-xs cursor-pointer">
+                  <option value="0.75" class="bg-slate-900">0.75x</option>
+                  <option value="1.0" selected class="bg-slate-900">1.0x (Normal)</option>
+                  <option value="1.25" class="bg-slate-900">1.25x</option>
+                  <option value="1.5" class="bg-slate-900">1.5x</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Right Column: DSP Tuning Controls & WAV Exporter (4 Cols) -->
+      <div class="lg:col-span-4 flex flex-col gap-6">
+        
+        <!-- DSP Parametric Tuning Card -->
+        <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-lg flex flex-col gap-4">
+          <div class="flex items-center justify-between pb-2 border-b border-slate-800">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+              <i data-lucide="sliders" class="w-4 h-4 text-purple-400"></i>
+              Acapella Filter Tuning
+            </h3>
+            <button id="btnResetFilters" class="text-[11px] text-purple-400 hover:text-purple-300 hover:underline">Reset Defaults</button>
+          </div>
+
+          <!-- Parameter 1: Stereo Side Suppression -->
+          <div class="space-y-1.5">
+            <div class="flex justify-between items-center text-xs">
+              <span class="text-slate-300 font-medium">Stereo Side Suppression</span>
+              <span id="valSideSuppression" class="font-mono text-purple-400 font-semibold">100%</span>
+            </div>
+            <input type="range" id="sliderSideSuppression" min="0" max="1" step="0.01" value="1.0" class="w-full">
+            <p class="text-[11px] text-slate-400">Subtracts wide-panned stereo instruments from the center.</p>
+          </div>
+
+          <!-- Parameter 2: High-Pass Filter (Low Cut) -->
+          <div class="space-y-1.5">
+            <div class="flex justify-between items-center text-xs">
+              <span class="text-slate-300 font-medium">Low Cut (Bass & Kick Drum)</span>
+              <span id="valHighPass" class="font-mono text-purple-400 font-semibold">180 Hz</span>
+            </div>
+            <input type="range" id="sliderHighPass" min="80" max="400" step="5" value="180" class="w-full">
+            <p class="text-[11px] text-slate-400">Cuts out sub-bass and kick rumble bleed from the vocals.</p>
+          </div>
+
+          <!-- Parameter 3: Low-Pass Filter (High Cut) -->
+          <div class="space-y-1.5">
+            <div class="flex justify-between items-center text-xs">
+              <span class="text-slate-300 font-medium">High Cut (Hi-Hats & Cymbals)</span>
+              <span id="valLowPass" class="font-mono text-purple-400 font-semibold">5500 Hz</span>
+            </div>
+            <input type="range" id="sliderLowPass" min="3000" max="12000" step="100" value="5500" class="w-full">
+            <p class="text-[11px] text-slate-400">Removes high-frequency drum sizzle and synthesizer sparkle.</p>
+          </div>
+
+          <!-- Parameter 4: Vocal Presence EQ Boost -->
+          <div class="space-y-1.5">
+            <div class="flex justify-between items-center text-xs">
+              <span class="text-slate-300 font-medium">Vocal Presence Peak Gain</span>
+              <span id="valPresenceGain" class="font-mono text-purple-400 font-semibold">+4.5 dB</span>
+            </div>
+            <input type="range" id="sliderPresenceGain" min="0" max="12" step="0.5" value="4.5" class="w-full">
+            <p class="text-[11px] text-slate-400">Boosts the 2.2 kHz human vocal formant frequency.</p>
+          </div>
+
+          <!-- Parameter 5: Vocal Presence Center Frequency -->
+          <div class="space-y-1.5">
+            <div class="flex justify-between items-center text-xs">
+              <span class="text-slate-300 font-medium">Formant Center Frequency</span>
+              <span id="valPresenceFreq" class="font-mono text-purple-400 font-semibold">2200 Hz</span>
+            </div>
+            <input type="range" id="sliderPresenceFreq" min="1000" max="3800" step="50" value="2200" class="w-full">
+            <p class="text-[11px] text-slate-400">Adjusts the sweet spot center of the vocal enhancement EQ.</p>
+          </div>
+        </div>
+
+        <!-- Export Acapella File Card -->
+        <div class="bg-gradient-to-br from-purple-950/50 to-slate-900 border border-purple-900/50 rounded-2xl p-5 shadow-lg flex flex-col gap-3">
+          <div class="flex items-center gap-2">
+            <i data-lucide="download" class="w-5 h-5 text-purple-400"></i>
+            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-200">Export Acapella Audio</h3>
+          </div>
+          <p class="text-xs text-slate-400 leading-relaxed">
+            Renders the active center-channel extraction and vocal bandpass filter offline to create a pristine 16-bit uncompressed WAV file.
+          </p>
+
+          <button id="btnExportWav" class="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:from-purple-500 hover:to-fuchsia-500 active:scale-[0.98] text-white font-medium text-xs flex items-center justify-center gap-2 shadow-lg shadow-purple-600/30 transition disabled:opacity-50 disabled:pointer-events-none">
+            <i data-lucide="file-audio" class="w-4 h-4"></i>
+            <span id="exportBtnText">Export Acapella (WAV)</span>
+          </button>
+          
+          <div id="exportProgressBar" class="hidden w-full bg-slate-800 rounded-full h-2 overflow-hidden">
+            <div id="exportProgressFill" class="bg-gradient-to-r from-purple-500 to-pink-500 h-full w-0 transition-all duration-150"></div>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  </main>
+
+  <script>
+    // Master Web Audio API references
+    let audioCtx = null;
+    let audioBuffer = null;
+    let sourceNode = null;
+    let isPlaying = false;
+    let isLooping = false;
+    let playbackStartTime = 0;
+    let startOffset = 0;
+    let activeMode = 'acapella'; // 'acapella', 'centerRaw', 'sidesInstrumental', 'original'
+    let animationFrameId = null;
+
+    // DSP Node References
+    let splitter = null;
+    let merger = null;
+    let masterGain = null;
+    let analyser = null;
+    let highPassFilter = null;
+    let lowPassFilter = null;
+    let presenceFilter = null;
+
+    // DOM Elements
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+    const loadedFileInfo = document.getElementById('loadedFileInfo');
+    const currentFileName = document.getElementById('currentFileName');
+    const audioSampleRate = document.getElementById('audioSampleRate');
+    const btnPlayPause = document.getElementById('btnPlayPause');
+    const playIcon = document.getElementById('playIcon');
+    const btnSkipBack = document.getElementById('btnSkipBack');
+    const btnSkipForward = document.getElementById('btnSkipForward');
+    const btnLoop = document.getElementById('btnLoop');
+    const loopIcon = document.getElementById('loopIcon');
+    const seekSlider = document.getElementById('seekSlider');
+    const currentTimeLabel = document.getElementById('currentTimeLabel');
+    const totalDurationLabel = document.getElementById('totalDurationLabel');
+    const volumeSlider = document.getElementById('volumeSlider');
+    const btnMute = document.getElementById('btnMute');
+    const volumeIcon = document.getElementById('volumeIcon');
+    const playbackRateSelect = document.getElementById('playbackRateSelect');
+    const btnExportWav = document.getElementById('btnExportWav');
+    const exportBtnText = document.getElementById('exportBtnText');
+    const exportProgressBar = document.getElementById('exportProgressBar');
+    const exportProgressFill = document.getElementById('exportProgressFill');
+    const btnLoadDemo = document.getElementById('btnLoadDemo');
+    const btnHelp = document.getElementById('btnHelp');
+    const infoModal = document.getElementById('infoModal');
+    const btnCloseModal = document.getElementById('btnCloseModal');
+    const btnDismissModal = document.getElementById('btnDismissModal');
+    const toast = document.getElementById('toast');
+    const toastMsg = document.getElementById('toastMsg');
+    const canvas = document.getElementById('visualizerCanvas');
+    const canvasOverlay = document.getElementById('canvasOverlay');
+    const canvasCtx = canvas.getContext('2d');
+    const modeButtons = document.querySelectorAll('.mode-btn');
+    const activeModeBadge = document.getElementById('activeModeBadge');
+    const filterCutoffRangeBadge = document.getElementById('filterCutoffRangeBadge');
+
+    // DSP Tuning Sliders
+    const sliderSideSuppression = document.getElementById('sliderSideSuppression');
+    const valSideSuppression = document.getElementById('valSideSuppression');
+    const sliderHighPass = document.getElementById('sliderHighPass');
+    const valHighPass = document.getElementById('valHighPass');
+    const sliderLowPass = document.getElementById('sliderLowPass');
+    const valLowPass = document.getElementById('valLowPass');
+    const sliderPresenceGain = document.getElementById('sliderPresenceGain');
+    const valPresenceGain = document.getElementById('valPresenceGain');
+    const sliderPresenceFreq = document.getElementById('sliderPresenceFreq');
+    const valPresenceFreq = document.getElementById('valPresenceFreq');
+    const btnResetFilters = document.getElementById('btnResetFilters');
+
+    function showToast(message, isError = false) {
+      toastMsg.textContent = message;
+      toast.classList.remove('translate-y-20', 'opacity-0');
+      toast.classList.add('translate-y-0', 'opacity-100');
+      const icon = toast.querySelector('i');
+      if (icon) {
+        icon.setAttribute('data-lucide', isError ? 'alert-triangle' : 'check-circle');
+        icon.className = `w-4 h-4 ${isError ? 'text-amber-400' : 'text-purple-400'}`;
+        lucide.createIcons();
+      }
+      setTimeout(() => {
+        toast.classList.remove('translate-y-0', 'opacity-100');
+        toast.classList.add('translate-y-20', 'opacity-0');
+      }, 3500);
+    }
+
+    function formatTime(seconds) {
+      if (isNaN(seconds) || seconds < 0) return '0:00';
+      const m = Math.floor(seconds / 60);
+      const s = Math.floor(seconds % 60);
+      return `${m}:${s < 10 ? '0' : ''}${s}`;
+    }
+
+    function initAudioContext() {
+      if (!audioCtx) {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        audioCtx = new AudioContextClass();
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+    }
+
+    /**
+     * Builds the Center Channel Vocal Extraction Graph:
+     * 1. Source -> Splitter (L = 0, R = 1)
+     * 2. Mid Signal = 0.5 * L + 0.5 * R
+     * 3. Side Signal = 0.5 * L - 0.5 * R
+     * 4. Center Vocal = Mid - (SideSuppression * |Side|)
+     * 5. Filters: High-Pass (180Hz) -> Low-Pass (5.5kHz) -> Peaking Formant EQ (+4.5dB @ 2.2kHz)
+     */
+    function buildDspGraph() {
+      if (!audioCtx) return;
+
+      masterGain = audioCtx.createGain();
+      masterGain.gain.value = parseFloat(volumeSlider.value);
+
+      analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 512;
+      analyser.smoothingTimeConstant = 0.8;
+
+      splitter = audioCtx.createChannelSplitter(2);
+      merger = audioCtx.createChannelMerger(2);
+
+      // Low cut to strip kicks/bass
+      highPassFilter = audioCtx.createBiquadFilter();
+      highPassFilter.type = "highpass";
+      highPassFilter.frequency.value = parseFloat(sliderHighPass.value);
+
+      // High cut to strip hi-hats/cymbals
+      lowPassFilter = audioCtx.createBiquadFilter();
+      lowPassFilter.type = "lowpass";
+      lowPassFilter.frequency.value = parseFloat(sliderLowPass.value);
+
+      // Peaking EQ for vocal clarity
+      presenceFilter = audioCtx.createBiquadFilter();
+      presenceFilter.type = "peaking";
+      presenceFilter.frequency.value = parseFloat(sliderPresenceFreq.value);
+      presenceFilter.gain.value = parseFloat(sliderPresenceGain.value);
+      presenceFilter.Q.value = 1.2;
+
+      // Master output pipeline
+      masterGain.connect(analyser);
+      analyser.connect(audioCtx.destination);
+    }
+
+    function updateRoutingForCurrentMode() {
+      if (!audioCtx || !sourceNode) return;
+
+      try {
+        sourceNode.disconnect();
+        splitter.disconnect();
+        highPassFilter.disconnect();
+        lowPassFilter.disconnect();
+        presenceFilter.disconnect();
+        merger.disconnect();
+
+        if (activeMode === 'original') {
+          // Bypass: Direct unmodified track
+          sourceNode.connect(masterGain);
+          activeModeBadge.textContent = "Original Track (Bypass)";
+        } else if (activeMode === 'centerRaw') {
+          // Mid Channel Only = 0.5*L + 0.5*R (Raw Center without frequency cuts)
+          const midSumL = audioCtx.createGain();
+          const midSumR = audioCtx.createGain();
+          midSumL.gain.value = 0.5;
+          midSumR.gain.value = 0.5;
+
+          sourceNode.connect(splitter);
+          splitter.connect(midSumL, 0);
+          splitter.connect(midSumR, 1);
+
+          midSumL.connect(masterGain);
+          midSumR.connect(masterGain);
+          activeModeBadge.textContent = "Raw Mid Channel (L+R)";
+        } else if (activeMode === 'sidesInstrumental') {
+          // Side Channel Only = (L - R) / 2
+          const sideL = audioCtx.createGain();
+          const sideR = audioCtx.createGain();
+          const invR = audioCtx.createGain();
+          const invL = audioCtx.createGain();
+
+          sideL.gain.value = 0.5;
+          sideR.gain.value = 0.5;
+          invR.gain.value = -0.5;
+          invL.gain.value = -0.5;
+
+          sourceNode.connect(splitter);
+          // Left side: L - R
+          splitter.connect(sideL, 0);
+          splitter.connect(invR, 1);
+          sideL.connect(merger, 0, 0);
+          invR.connect(merger, 0, 0);
+
+          // Right side: R - L
+          splitter.connect(sideR, 1);
+          splitter.connect(invL, 0);
+          sideR.connect(merger, 0, 1);
+          invL.connect(merger, 0, 1);
+
+          merger.connect(masterGain);
+          activeModeBadge.textContent = "Stereo Sides (Removed Instruments)";
+        } else {
+          // 'acapella' Mode: Mid minus Stereo Side difference + Vocal Formant Filtering
+          const sideFactor = parseFloat(sliderSideSuppression.value);
+
+          const midSum = audioCtx.createGain();
+          midSum.gain.value = 0.5;
+
+          const sideDiffL = audioCtx.createGain();
+          const sideDiffR = audioCtx.createGain();
+          sideDiffL.gain.value = 0.5 * sideFactor;
+          sideDiffR.gain.value = -0.5 * sideFactor;
+
+          // Connect splitter
+          sourceNode.connect(splitter);
+
+          // Center Sum (L + R)
+          splitter.connect(midSum, 0);
+          splitter.connect(midSum, 1);
+
+          // Subtract Side variance (L - R) from center
+          const subDiff = audioCtx.createGain();
+          subDiff.gain.value = -0.7 * sideFactor;
+          splitter.connect(sideDiffL, 0);
+          splitter.connect(sideDiffR, 1);
+          sideDiffL.connect(subDiff);
+          sideDiffR.connect(subDiff);
+
+          // Vocal Bandpass & Formant Filter Chain:
+          // Center audio -> HighPass -> LowPass -> Vocal Presence Peak EQ -> Master
+          highPassFilter.frequency.value = parseFloat(sliderHighPass.value);
+          lowPassFilter.frequency.value = parseFloat(sliderLowPass.value);
+          presenceFilter.frequency.value = parseFloat(sliderPresenceFreq.value);
+          presenceFilter.gain.value = parseFloat(sliderPresenceGain.value);
+
+          midSum.connect(highPassFilter);
+          subDiff.connect(highPassFilter);
+
+          highPassFilter.connect(lowPassFilter);
+          lowPassFilter.connect(presenceFilter);
+          presenceFilter.connect(masterGain);
+
+          activeModeBadge.textContent = "Acapella (Vocal Isolated)";
+          filterCutoffRangeBadge.textContent = `${sliderHighPass.value}Hz - ${sliderLowPass.value}Hz`;
+        }
+      } catch (err) {
+        console.error("DSP connection error:", err);
+      }
+    }
+
+    function playAudio(fromTime = null) {
+      if (!audioBuffer) {
+        showToast("Please load an audio file or click 'Synthesize Demo Track' first.", true);
+        return;
+      }
+      initAudioContext();
+
+      if (isPlaying) {
+        stopAudioPlayback(false);
+      }
+
+      sourceNode = audioCtx.createBufferSource();
+      sourceNode.buffer = audioBuffer;
+      sourceNode.loop = isLooping;
+      sourceNode.playbackRate.value = parseFloat(playbackRateSelect.value);
+
+      if (fromTime !== null) {
+        startOffset = fromTime;
+      }
+
+      buildDspGraph();
+      updateRoutingForCurrentMode();
+
+      sourceNode.onended = () => {
+        if (!isLooping && isPlaying && getCurrentAudioTime() >= audioBuffer.duration - 0.2) {
+          pauseAudio();
+          startOffset = 0;
+          seekSlider.value = 0;
+          currentTimeLabel.textContent = "0:00";
+        }
+      };
+
+      sourceNode.start(0, startOffset);
+      playbackStartTime = audioCtx.currentTime;
+      isPlaying = true;
+      updatePlayButtonUI(true);
+      canvasOverlay.classList.add('opacity-0', 'pointer-events-none');
+    }
+
+    function pauseAudio() {
+      if (isPlaying && sourceNode) {
+        startOffset += (audioCtx.currentTime - playbackStartTime) * parseFloat(playbackRateSelect.value);
+        if (startOffset > audioBuffer.duration) startOffset = 0;
+        stopAudioPlayback(false);
+      }
+      isPlaying = false;
+      updatePlayButtonUI(false);
+    }
+
+    function stopAudioPlayback(resetOffset = true) {
+      if (sourceNode) {
+        try {
+          sourceNode.stop();
+          sourceNode.disconnect();
+        } catch (e) {}
+        sourceNode = null;
+      }
+      if (resetOffset) startOffset = 0;
+    }
+
+    function togglePlayPause() {
+      if (isPlaying) {
+        pauseAudio();
+      } else {
+        playAudio();
+      }
+    }
+
+    function getCurrentAudioTime() {
+      if (!isPlaying || !audioCtx) return startOffset;
+      const rate = parseFloat(playbackRateSelect.value) || 1.0;
+      let cur = startOffset + (audioCtx.currentTime - playbackStartTime) * rate;
+      if (audioBuffer && isLooping && cur > audioBuffer.duration) {
+        cur = cur % audioBuffer.duration;
+      }
+      return cur;
+    }
+
+    function updatePlayButtonUI(playing) {
+      if (playing) {
+        playIcon.setAttribute('data-lucide', 'pause');
+      } else {
+        playIcon.setAttribute('data-lucide', 'play');
+      }
+      lucide.createIcons();
+    }
+
+    function generateDemoTrack() {
+      initAudioContext();
+      showToast("Synthesizing stereo pop demo track with centered vocal lead...");
+
+      const sampleRate = audioCtx.sampleRate;
+      const duration = 12.0; // 12-second seamless loop
+      const totalSamples = Math.floor(sampleRate * duration);
+      const demoBuffer = audioCtx.createBuffer(2, totalSamples, sampleRate);
+      const left = demoBuffer.getChannelData(0);
+      const right = demoBuffer.getChannelData(1);
+
+      for (let i = 0; i < totalSamples; i++) {
+        const t = i / sampleRate;
+        const beat = (t * 2.0) % 1.0; // 120 BPM
+
+        // 1. Kick Drum (60Hz low frequency, centered)
+        const kickPitch = Math.max(45, 130 * Math.exp(-beat * 25));
+        const kickEnv = Math.exp(-beat * 14);
+        const kick = Math.sin(2 * Math.PI * kickPitch * t) * kickEnv * 0.45;
+
+        // 2. Wide Stereo Synthesizer Chords (Panned hard left and right)
+        // Progression: C, G, Am, F
+        const chordProgressions = [261.63, 196.00, 220.00, 174.61];
+        const baseFreq = chordProgressions[Math.floor(t) % 4];
+
+        // Left synth voice
+        const leftSynth = (
+          Math.sin(2 * Math.PI * baseFreq * t) +
+          0.5 * Math.sin(2 * Math.PI * baseFreq * 1.5 * t) +
+          0.25 * Math.sin(2 * Math.PI * baseFreq * 2.02 * t)
+        ) * 0.16;
+
+        // Right synth voice (slightly detuned and phase offset for stereo width)
+        const rightSynth = (
+          Math.sin(2 * Math.PI * (baseFreq + 1.5) * t) +
+          0.5 * Math.sin(2 * Math.PI * (baseFreq * 1.5 - 1.2) * t) +
+          0.25 * Math.sin(2 * Math.PI * (baseFreq * 1.98) * t)
+        ) * 0.16;
+
+        // 3. Stereo Hi-Hats & Shakers (Stereo alternate panning)
+        const hatEnv = Math.exp(-((t * 4.0) % 1.0) * 40);
+        const hatNoise = (Math.random() * 2 - 1) * hatEnv * 0.07;
+        const leftHat = (Math.floor(t * 4) % 2 === 0) ? hatNoise : 0;
+        const rightHat = (Math.floor(t * 4) % 2 === 1) ? hatNoise : 0;
+
+        // 4. Centered Vocal Melody: Formant-rich expressive singing lead
+        // Melody notes: A4 (440Hz), C5 (523Hz), E5 (659Hz), D5 (587Hz), C5 (523Hz)
+        const vocalNotes = [440, 523.25, 659.25, 587.33, 523.25, 440];
+        const noteIndex = Math.floor(t * 1.5) % vocalNotes.length;
+        const vocalFreq = vocalNotes[noteIndex];
+
+        // Natural vocal vibrato (5.6 Hz)
+        const vibrato = 1 + 0.016 * Math.sin(2 * Math.PI * 5.6 * t);
+
+        // Vocal Formants (F1, F2, F3) synthesis simulating human vowel "Ah / Oh"
+        const f0 = vocalFreq * vibrato;
+        const vocalWave = (
+          Math.sin(2 * Math.PI * f0 * t) * 0.40 +
+          Math.sin(2 * Math.PI * f0 * 2 * t) * 0.28 +
+          Math.sin(2 * Math.PI * f0 * 3 * t) * 0.18 +
+          Math.sin(2 * Math.PI * f0 * 4 * t) * 0.10
+        );
+
+        // Vocal breath / phrasing envelope
+        const phrase = Math.max(0, Math.sin(2 * Math.PI * (t / 2.0)));
+        const vocalLead = vocalWave * (0.35 + 0.65 * phrase) * 0.35;
+
+        // Left and Right channels:
+        // Vocal lead & kick drum are identical in both (Center).
+        // Synths and hats are wide stereo.
+        left[i] = Math.max(-1, Math.min(1, kick + leftSynth + leftHat + vocalLead));
+        right[i] = Math.max(-1, Math.min(1, kick + rightSynth + rightHat + vocalLead));
+      }
+
+      loadDecodedAudioBuffer(demoBuffer, "Stereo_Pop_Vocal_Demo (Synthetic).wav");
+      showToast("Demo loaded! Switch modes to audition isolated vocals vs original.");
+    }
+
+    function loadDecodedAudioBuffer(buffer, filename) {
+      if (isPlaying) {
+        stopAudioPlayback(true);
+      }
+      audioBuffer = buffer;
+      startOffset = 0;
+      seekSlider.value = 0;
+      seekSlider.max = buffer.duration;
+      currentTimeLabel.textContent = "0:00";
+      totalDurationLabel.textContent = formatTime(buffer.duration);
+
+      currentFileName.textContent = filename;
+      audioSampleRate.textContent = `${buffer.sampleRate}Hz • ${buffer.numberOfChannels === 2 ? 'Stereo' : 'Mono'}`;
+      loadedFileInfo.classList.remove('hidden');
+      loadedFileInfo.classList.add('flex');
+
+      playAudio(0);
+    }
+
+    async function handleAudioFile(file) {
+      if (!file) return;
+      initAudioContext();
+      showToast(`Loading "${file.name}"...`);
+
+      try {
+        const arrayBuffer = await file.arrayBuffer();
+        audioCtx.decodeAudioData(
+          arrayBuffer,
+          (decodedBuffer) => {
+            if (decodedBuffer.numberOfChannels < 2) {
+              showToast("Note: This file is Mono. Stereo files yield optimal center vocal extraction!", true);
+            }
+            loadDecodedAudioBuffer(decodedBuffer, file.name);
+            showToast(`Loaded: ${file.name}`);
+          },
+          (err) => {
+            console.error(err);
+            showToast("Failed to decode audio. Please try another audio format.", true);
+          }
+        );
+      } catch (err) {
+        console.error(err);
+        showToast("Error reading file.", true);
+      }
+    }
+
+    async function exportAcapellaWav() {
+      if (!audioBuffer) {
+        showToast("No audio loaded to export.", true);
+        return;
+      }
+
+      btnExportWav.disabled = true;
+      exportBtnText.textContent = "Rendering Acapella...";
+      exportProgressBar.classList.remove('hidden');
+      exportProgressFill.style.width = "20%";
+
+      try {
+        const duration = audioBuffer.duration;
+        const sampleRate = audioBuffer.sampleRate;
+        const offlineCtx = new OfflineAudioContext(2, Math.ceil(duration * sampleRate), sampleRate);
+
+        const offSource = offlineCtx.createBufferSource();
+        offSource.buffer = audioBuffer;
+
+        const offSplitter = offlineCtx.createChannelSplitter(2);
+        const offMerger = offlineCtx.createChannelMerger(2);
+
+        // Calculate parameters
+        const sideFactor = parseFloat(sliderSideSuppression.value);
+        const hpFreq = parseFloat(sliderHighPass.value);
+        const lpFreq = parseFloat(sliderLowPass.value);
+        const pFreq = parseFloat(sliderPresenceFreq.value);
+        const pGain = parseFloat(sliderPresenceGain.value);
+
+        // Center Mid sum = 0.5 * L + 0.5 * R
+        const offMid = offlineCtx.createGain();
+        offMid.gain.value = 0.5;
+
+        // Side difference subtraction = -0.7 * (L - R)
+        const offSideL = offlineCtx.createGain();
+        const offSideR = offlineCtx.createGain();
+        const offSubDiff = offlineCtx.createGain();
+        offSideL.gain.value = 0.5 * sideFactor;
+        offSideR.gain.value = -0.5 * sideFactor;
+        offSubDiff.gain.value = -0.7 * sideFactor;
+
+        offSource.connect(offSplitter);
+        offSplitter.connect(offMid, 0);
+        offSplitter.connect(offMid, 1);
+
+        offSplitter.connect(offSideL, 0);
+        offSplitter.connect(offSideR, 1);
+        offSideL.connect(offSubDiff);
+        offSideR.connect(offSubDiff);
+
+        // Vocal Bandpass filter chain
+        const offHp = offlineCtx.createBiquadFilter();
+        offHp.type = "highpass";
+        offHp.frequency.value = hpFreq;
+
+        const offLp = offlineCtx.createBiquadFilter();
+        offLp.type = "lowpass";
+        offLp.frequency.value = lpFreq;
+
+        const offPresence = offlineCtx.createBiquadFilter();
+        offPresence.type = "peaking";
+        offPresence.frequency.value = pFreq;
+        offPresence.gain.value = pGain;
+        offPresence.Q.value = 1.2;
+
+        offMid.connect(offHp);
+        offSubDiff.connect(offHp);
+        offHp.connect(offLp);
+        offLp.connect(offPresence);
+
+        // Route mono vocal to both stereo channels
+        offPresence.connect(offMerger, 0, 0);
+        offPresence.connect(offMerger, 0, 1);
+        offMerger.connect(offlineCtx.destination);
+
+        offSource.start(0);
+        exportProgressFill.style.width = "55%";
+
+        const renderedBuffer = await offlineCtx.startRendering();
+        exportProgressFill.style.width = "85%";
+
+        const wavBlob = audioBufferToWavBlob(renderedBuffer);
+        const downloadUrl = URL.createObjectURL(wavBlob);
+
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = downloadUrl;
+        const originalName = currentFileName.textContent.replace(/\.[^/.]+$/, "");
+        a.download = `${originalName}_Acapella_Isolated.wav`;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => {
+          document.body.removeChild(a);
+          URL.revokeObjectURL(downloadUrl);
+        }, 2000);
+
+        exportProgressFill.style.width = "100%";
+        showToast("Acapella WAV successfully exported!");
+      } catch (err) {
+        console.error("Export failed:", err);
+        showToast("Failed to render export file.", true);
+      } finally {
+        setTimeout(() => {
+          btnExportWav.disabled = false;
+          exportBtnText.textContent = "Export Acapella (WAV)";
+          exportProgressBar.classList.add('hidden');
+          exportProgressFill.style.width = "0%";
+        }, 1200);
+      }
+    }
+
+    function audioBufferToWavBlob(buffer) {
+      const numOfChan = buffer.numberOfChannels;
+      const length = buffer.length * numOfChan * 2 + 44;
+      const out = new DataView(new ArrayBuffer(length));
+      const channels = [];
+      let sample = 0;
+      let offset = 0;
+      let pos = 0;
+
+      writeString(out, 0, 'RIFF');
+      out.setUint32(4, 36 + buffer.length * numOfChan * 2, true);
+      writeString(out, 8, 'WAVE');
+      writeString(out, 12, 'fmt ');
+      out.setUint32(16, 16, true);
+      out.setUint16(20, 1, true);
+      out.setUint16(22, numOfChan, true);
+      out.setUint32(24, buffer.sampleRate, true);
+      out.setUint32(28, buffer.sampleRate * 2 * numOfChan, true);
+      out.setUint16(32, numOfChan * 2, true);
+      out.setUint16(34, 16, true);
+      writeString(out, 36, 'data');
+      out.setUint32(40, buffer.length * numOfChan * 2, true);
+
+      for (let i = 0; i < buffer.numberOfChannels; i++) {
+        channels.push(buffer.getChannelData(i));
+      }
+
+      offset = 44;
+      while (pos < buffer.length) {
+        for (let i = 0; i < numOfChan; i++) {
+          sample = Math.max(-1, Math.min(1, channels[i][pos]));
+          sample = (sample < 0 ? sample * 32768 : sample * 32767) | 0;
+          out.setInt16(offset, sample, true);
+          offset += 2;
+        }
+        pos++;
+      }
+
+      return new Blob([out.buffer], { type: 'audio/wav' });
+
+      function writeString(view, offset, string) {
+        for (let i = 0; i < string.length; i++) {
+          view.setUint8(offset + i, string.charCodeAt(i));
+        }
+      }
+    }
+
+    function renderVisualizer() {
+      animationFrameId = requestAnimationFrame(renderVisualizer);
+
+      const width = canvas.width = canvas.parentElement.clientWidth;
+      const height = canvas.height = canvas.parentElement.clientHeight;
+
+      // Dark background gradient
+      const bgGrad = canvasCtx.createLinearGradient(0, 0, 0, height);
+      bgGrad.addColorStop(0, '#0f0a1c');
+      bgGrad.addColorStop(1, '#020617');
+      canvasCtx.fillStyle = bgGrad;
+      canvasCtx.fillRect(0, 0, width, height);
+
+      // Grid overlay
+      canvasCtx.strokeStyle = 'rgba(168, 85, 247, 0.08)';
+      canvasCtx.lineWidth = 1;
+      for (let x = 0; x < width; x += 40) {
+        canvasCtx.beginPath();
+        canvasCtx.moveTo(x, 0);
+        canvasCtx.lineTo(x, height);
+        canvasCtx.stroke();
+      }
+      for (let y = 0; y < height; y += 30) {
+        canvasCtx.beginPath();
+        canvasCtx.moveTo(0, y);
+        canvasCtx.lineTo(width, y);
+        canvasCtx.stroke();
+      }
+
+      if (!analyser || !isPlaying) return;
+
+      const bufferLength = analyser.frequencyBinCount;
+      const dataArray = new Uint8Array(bufferLength);
+      analyser.getByteFrequencyData(dataArray);
+
+      // Vocal Formant Spectrum Bars (Purple to Magenta glow)
+      const barWidth = (width / bufferLength) * 2.2;
+      let barX = 0;
+
+      for (let i = 0; i < bufferLength; i++) {
+        const barHeight = (dataArray[i] / 255) * (height * 0.85);
+
+        const barGrad = canvasCtx.createLinearGradient(0, height, 0, height - barHeight);
+        barGrad.addColorStop(0, 'rgba(147, 51, 234, 0.2)');
+        barGrad.addColorStop(0.5, 'rgba(168, 85, 247, 0.8)');
+        barGrad.addColorStop(1, 'rgba(232, 121, 249, 1)');
+
+        canvasCtx.fillStyle = barGrad;
+        canvasCtx.fillRect(barX, height - barHeight, barWidth - 1.5, barHeight);
+
+        if (barHeight > 6) {
+          canvasCtx.fillStyle = '#f5d0fe';
+          canvasCtx.fillRect(barX, height - barHeight - 2, barWidth - 1.5, 2);
+        }
+
+        barX += barWidth;
+        if (barX > width) break;
+      }
+
+      // Update scrub slider
+      if (audioBuffer) {
+        const curTime = getCurrentAudioTime();
+        seekSlider.value = curTime;
+        currentTimeLabel.textContent = formatTime(curTime);
+      }
+    }
+
+    function setupEventListeners() {
+      // File upload dropzone
+      dropZone.addEventListener('click', () => fileInput.click());
+      fileInput.addEventListener('change', (e) => {
+        if (e.target.files && e.target.files[0]) {
+          handleAudioFile(e.target.files[0]);
+        }
+      });
+
+      ['dragenter', 'dragover'].forEach(eventName => {
+        dropZone.addEventListener(eventName, (e) => {
+          e.preventDefault();
+          dropZone.classList.add('border-purple-500', 'bg-purple-950/20');
+        }, false);
+      });
+
+      ['dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, (e) => {
+          e.preventDefault();
+          dropZone.classList.remove('border-purple-500', 'bg-purple-950/20');
+        }, false);
+      });
+
+      dropZone.addEventListener('drop', (e) => {
+        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+          handleAudioFile(e.dataTransfer.files[0]);
+        }
+      });
+
+      // Player Controls
+      btnPlayPause.addEventListener('click', togglePlayPause);
+      
+      btnSkipBack.addEventListener('click', () => {
+        if (!audioBuffer) return;
+        const newTime = Math.max(0, getCurrentAudioTime() - 5);
+        playAudio(newTime);
+      });
+
+      btnSkipForward.addEventListener('click', () => {
+        if (!audioBuffer) return;
+        const newTime = Math.min(audioBuffer.duration, getCurrentAudioTime() + 5);
+        playAudio(newTime);
+      });
+
+      btnLoop.addEventListener('click', () => {
+        isLooping = !isLooping;
+        if (sourceNode) sourceNode.loop = isLooping;
+        if (isLooping) {
+          btnLoop.classList.add('text-purple-400', 'bg-purple-950/60', 'border', 'border-purple-500/40');
+          showToast("Looping enabled");
+        } else {
+          btnLoop.classList.remove('text-purple-400', 'bg-purple-950/60', 'border', 'border-purple-500/40');
+          showToast("Looping disabled");
+        }
+      });
+
+      seekSlider.addEventListener('input', () => {
+        if (audioBuffer) {
+          currentTimeLabel.textContent = formatTime(parseFloat(seekSlider.value));
+        }
+      });
+
+      seekSlider.addEventListener('change', () => {
+        if (audioBuffer) {
+          const seekTo = parseFloat(seekSlider.value);
+          if (isPlaying) {
+            playAudio(seekTo);
+          } else {
+            startOffset = seekTo;
+          }
+        }
+      });
+
+      volumeSlider.addEventListener('input', () => {
+        const val = parseFloat(volumeSlider.value);
+        if (masterGain) masterGain.gain.value = val;
+        volumeIcon.setAttribute('data-lucide', val === 0 ? 'volume-x' : (val < 0.5 ? 'volume-1' : 'volume-2'));
+        lucide.createIcons();
+      });
+
+      btnMute.addEventListener('click', () => {
+        if (volumeSlider.value > 0) {
+          volumeSlider.dataset.prev = volumeSlider.value;
+          volumeSlider.value = 0;
+        } else {
+          volumeSlider.value = volumeSlider.dataset.prev || 0.9;
+        }
+        volumeSlider.dispatchEvent(new Event('input'));
+      });
+
+      playbackRateSelect.addEventListener('change', () => {
+        const rate = parseFloat(playbackRateSelect.value);
+        if (sourceNode) sourceNode.playbackRate.value = rate;
+      });
+
+      // Mode switching
+      modeButtons.forEach(btn => {
+        btn.addEventListener('click', () => {
+          modeButtons.forEach(b => {
+            b.classList.remove('active', 'border-purple-500', 'bg-purple-600/25', 'text-purple-200');
+            b.classList.add('border-slate-800', 'bg-slate-800/40', 'text-slate-300');
+          });
+          btn.classList.add('active', 'border-purple-500', 'bg-purple-600/25', 'text-purple-200');
+          btn.classList.remove('border-slate-800', 'bg-slate-800/40', 'text-slate-300');
+
+          activeMode = btn.dataset.mode;
+          updateRoutingForCurrentMode();
+
+          const labels = {
+            acapella: "Acapella (Vocal Isolated)",
+            centerRaw: "Raw Mid-Channel Sum",
+            sidesInstrumental: "Stereo Sides (Removed Elements)",
+            original: "Original Audio (Bypass)"
+          };
+          showToast(`Mode switched: ${labels[activeMode]}`);
+        });
+      });
+
+      // Tuning Slider Controls
+      sliderSideSuppression.addEventListener('input', () => {
+        valSideSuppression.textContent = `${Math.round(sliderSideSuppression.value * 100)}%`;
+        updateRoutingForCurrentMode();
+      });
+
+      sliderHighPass.addEventListener('input', () => {
+        valHighPass.textContent = `${sliderHighPass.value} Hz`;
+        updateRoutingForCurrentMode();
+      });
+
+      sliderLowPass.addEventListener('input', () => {
+        valLowPass.textContent = `${sliderLowPass.value} Hz`;
+        updateRoutingForCurrentMode();
+      });
+
+      sliderPresenceGain.addEventListener('input', () => {
+        valPresenceGain.textContent = `+${parseFloat(sliderPresenceGain.value).toFixed(1)} dB`;
+        updateRoutingForCurrentMode();
+      });
+
+      sliderPresenceFreq.addEventListener('input', () => {
+        valPresenceFreq.textContent = `${sliderPresenceFreq.value} Hz`;
+        updateRoutingForCurrentMode();
+      });
+
+      btnResetFilters.addEventListener('click', () => {
+        sliderSideSuppression.value = 1.0;
+        sliderHighPass.value = 180;
+        sliderLowPass.value = 5500;
+        sliderPresenceGain.value = 4.5;
+        sliderPresenceFreq.value = 2200;
+
+        sliderSideSuppression.dispatchEvent(new Event('input'));
+        sliderHighPass.dispatchEvent(new Event('input'));
+        sliderLowPass.dispatchEvent(new Event('input'));
+        sliderPresenceGain.dispatchEvent(new Event('input'));
+        sliderPresenceFreq.dispatchEvent(new Event('input'));
+        showToast("Filters reset to optimal vocal extraction defaults");
+      });
+
+      // Demo & Export
+      btnLoadDemo.addEventListener('click', generateDemoTrack);
+      btnExportWav.addEventListener('click', exportAcapellaWav);
+
+      // Modal dialog controls
+      btnHelp.addEventListener('click', () => infoModal.classList.remove('hidden'));
+      btnCloseModal.addEventListener('click', () => infoModal.classList.add('hidden'));
+      btnDismissModal.addEventListener('click', () => infoModal.classList.add('hidden'));
+      infoModal.addEventListener('click', (e) => {
+        if (e.target === infoModal) infoModal.classList.add('hidden');
+      });
+
+      // Keyboard spacebar shortcut
+      window.addEventListener('keydown', (e) => {
+        if (e.code === 'Space' && e.target.tagName !== 'INPUT' && e.target.tagName !== 'SELECT') {
+          e.preventDefault();
+          togglePlayPause();
+        }
+      });
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      lucide.createIcons();
+      setupEventListeners();
+      renderVisualizer();
+    });
+  </script>
+</body>
+</html>
